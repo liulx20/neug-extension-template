@@ -1,3 +1,5 @@
+# Optional NeuG submodule for local development.
+# CI clones NeuG separately in MainDistributionPipeline.yml.
 [submodule "neug"]
 	path = neug
 	url = https://github.com/alibaba/neug.git

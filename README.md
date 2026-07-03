@@ -56,6 +56,14 @@ Faster rebuilds:
 GEN=ninja EXTRA_CMAKE_FLAGS=-G Ninja make
 ```
 
+## CI
+
+GitHub Actions clones NeuG into `./neug` before `make` (see `.github/workflows/MainDistributionPipeline.yml`).
+
+This extension needs NeuG with out-of-tree extension support (`cmake/neug_extension.cmake`, `NEUG_EXTENSION_CONFIGS`). The workflow defaults to `liulx20/neug@main` — push your NeuG fork before expecting CI green. Once [alibaba/neug](https://github.com/alibaba/neug) ships the same changes, switch the default repository to `alibaba/neug`.
+
+Manual workflow dispatch can override `neug_repository` and `neug_ref`.
+
 ## Tests
 
 ```sh
