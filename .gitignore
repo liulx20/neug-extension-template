@@ -1,0 +1,8 @@
+build/
+.idea/
+cmake-build-debug/
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+.vscode/

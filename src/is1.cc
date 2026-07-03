@@ -1,0 +1,155 @@
+/**
+ * Copyright 2020 Alibaba Group Holding Limited.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "is1.h"
+
+#include <array>
+#include <string>
+
+#include "ldbc_common.h"
+#include "neug/execution/common/columns/value_columns.h"
+#include "neug/utils/exception/exception.h"
+
+namespace neug {
+namespace extension {
+namespace ldbc_ic {
+namespace {
+
+constexpr size_t kNumOutputColumns = 8;
+
+std::unique_ptr<function::CallFuncInputBase> bind_is1(
+    const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
+    const ::physical::PhysicalPlan& plan, int op_idx) {
+  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  if (params.size() < 1 || !params[0].has_const_()) {
+    THROW_INVALID_ARGUMENT_EXCEPTION("is1: personId must be an integer literal");
+  }
+  auto input = std::make_unique<IS1FuncInput>();
+  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
+  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  return input;
+}
+
+execution::Context exec_is1(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
+  const auto& is1_input = dynamic_cast<const IS1FuncInput&>(input);
+  const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
+  const auto& schema = graph.schema();
+
+  const label_t person_label = schema.get_vertex_label_id("PERSON");
+  const label_t place_label = schema.get_vertex_label_id("PLACE");
+  const label_t is_located_in_label = schema.get_edge_label_id("ISLOCATEDIN");
+
+  auto first_name_col =
+      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
+  auto last_name_col =
+      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto birthday_col =
+      ldbc::get_vertex_column<Date>(graph, person_label, "birthday");
+  auto location_ip_col =
+      ldbc::get_vertex_column<std::string_view>(graph, person_label, "locationIP");
+  auto browser_used_col =
+      ldbc::get_vertex_column<std::string_view>(graph, person_label, "browserUsed");
+  auto gender_col =
+      ldbc::get_vertex_column<std::string_view>(graph, person_label, "gender");
+  auto creation_date_col =
+      ldbc::get_vertex_column<DateTime>(graph, person_label, "creationDate");
+
+  if (!first_name_col || !last_name_col || !birthday_col || !location_ip_col ||
+      !browser_used_col || !gender_col || !creation_date_col) {
+    THROW_RUNTIME_ERROR("is1: failed to load required LDBC property columns");
+  }
+
+  vid_t person_vid = StorageReadInterface::kInvalidVid;
+  if (!graph.GetVertexIndex(person_label,
+                            execution::Value::INT64(is1_input.person_id),
+                            person_vid)) {
+    return execution::Context{};
+  }
+
+  const auto located_in_out = graph.GetGenericOutgoingGraphView(
+      person_label, place_label, is_located_in_label);
+  const vid_t place_vid = ldbc::get_single_out_neighbor(located_in_out, person_vid);
+  int64_t city_id = 0;
+  if (place_vid != StorageReadInterface::kInvalidVid) {
+    city_id = graph.GetVertexId(place_label, place_vid).GetValue<int64_t>();
+  }
+
+  execution::ValueColumnBuilder<std::string> first_name_builder;
+  execution::ValueColumnBuilder<std::string> last_name_builder;
+  execution::ValueColumnBuilder<Date> birthday_builder;
+  execution::ValueColumnBuilder<std::string> location_ip_builder;
+  execution::ValueColumnBuilder<std::string> browser_used_builder;
+  execution::ValueColumnBuilder<int64_t> city_id_builder;
+  execution::ValueColumnBuilder<std::string> gender_builder;
+  execution::ValueColumnBuilder<DateTime> creation_date_builder;
+
+  first_name_builder.push_back_opt(
+      std::string(first_name_col->get_view(person_vid)));
+  last_name_builder.push_back_opt(
+      std::string(last_name_col->get_view(person_vid)));
+  birthday_builder.push_back_opt(birthday_col->get_view(person_vid));
+  location_ip_builder.push_back_opt(
+      std::string(location_ip_col->get_view(person_vid)));
+  browser_used_builder.push_back_opt(
+      std::string(browser_used_col->get_view(person_vid)));
+  city_id_builder.push_back_opt(city_id);
+  gender_builder.push_back_opt(std::string(gender_col->get_view(person_vid)));
+  creation_date_builder.push_back_opt(
+      creation_date_col->get_view(person_vid));
+
+  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
+      output_columns;
+  output_columns[0] = first_name_builder.finish();
+  output_columns[1] = last_name_builder.finish();
+  output_columns[2] = birthday_builder.finish();
+  output_columns[3] = location_ip_builder.finish();
+  output_columns[4] = browser_used_builder.finish();
+  output_columns[5] = city_id_builder.finish();
+  output_columns[6] = gender_builder.finish();
+  output_columns[7] = creation_date_builder.finish();
+
+  return ldbc::make_output_context(is1_input.output_aliases,
+                                   {output_columns[0], output_columns[1],
+                                    output_columns[2], output_columns[3],
+                                    output_columns[4], output_columns[5],
+                                    output_columns[6], output_columns[7]});
+}
+
+}  // namespace
+
+function::function_set IS1Function::getFunctionSet() {
+  auto function = std::make_unique<function::NeugCallFunction>(
+      IS1Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      std::vector<std::pair<std::string, common::DataTypeId>>{
+          {"firstName", common::DataTypeId::kVarchar},
+          {"lastName", common::DataTypeId::kVarchar},
+          {"birthday", common::DataTypeId::kDate},
+          {"locationIp", common::DataTypeId::kVarchar},
+          {"browserUsed", common::DataTypeId::kVarchar},
+          {"cityId", common::DataTypeId::kInt64},
+          {"gender", common::DataTypeId::kVarchar},
+          {"creationDate", common::DataTypeId::kTimestampMs}});
+  function->bindFunc = bind_is1;
+  function->execFunc = exec_is1;
+  function::function_set function_set;
+  function_set.push_back(std::move(function));
+  return function_set;
+}
+
+}  // namespace ldbc_ic
+}  // namespace extension
+}  // namespace neug

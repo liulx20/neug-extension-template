@@ -1,0 +1,38 @@
+#
+# Main distribution pipeline for NeuG extensions built from this template.
+#
+name: Main Extension Distribution Pipeline
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' && github.sha || '' }}
+  cancel-in-progress: true
+
+jobs:
+  linux-build:
+    name: Build extension (linux_x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install -y -qq build-essential cmake ninja-build libssl-dev
+
+      - name: Build extension
+        run: make
+
+      - name: Test extension
+        run: make test
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiggle-linux_x86_64
+          path: build/release/extension/wiggle/libwiggle.neug_extension

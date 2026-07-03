@@ -1,0 +1,4 @@
+[submodule "neug"]
+	path = neug
+	url = https://github.com/alibaba/neug.git
+	branch = main

@@ -1,0 +1,38 @@
+#
+# NOTE: this workflow tests the extension template itself.
+# It is removed when scripts/bootstrap-template.py is run.
+#
+name: Extension Template
+on: [push, pull_request, workflow_dispatch]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux
+    if: ${{ vars.RUN_RENAME_TEST == 'true' || github.repository == 'alibaba/neug-extension-template' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install -y -qq build-essential cmake ninja-build libssl-dev ccache
+
+      - name: Rename extension
+        run: python3 scripts/bootstrap-template.py ext_1_a_123b_b11
+
+      - name: Build
+        run: make
+
+      - name: Test
+        run: make test
