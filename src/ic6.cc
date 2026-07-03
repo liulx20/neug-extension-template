@@ -76,19 +76,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic6(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic6 requires 2 arguments: personId and tagName");
   }
-  if (!params[0].has_const_() || !params[1].has_const_()) {
-    THROW_INVALID_ARGUMENT_EXCEPTION("ic6: all arguments must be literals");
-  }
   auto input = std::make_unique<IC6FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->tag_name = ldbc::parse_string_arg(params[1].const_(), "tagName");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic6(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& ic6_input = dynamic_cast<const IC6FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const std::string tag_name = params.at("tagName").GetValue<std::string>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -107,13 +104,13 @@ execution::Context exec_ic6(const function::CallFuncInputBase& input,
 
   vid_t root = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(ic6_input.person_id),
+                            execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
 
   const vid_t tag_vid = ldbc::find_vertex_by_string_prop(
-      graph, tag_label, "name", ic6_input.tag_name);
+      graph, tag_label, "name", tag_name);
   if (tag_vid == StorageReadInterface::kInvalidVid) {
     return execution::Context{};
   }
@@ -189,7 +186,7 @@ function::function_set IC6Function::getFunctionSet() {
       IC6Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kVarchar},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"tagName", common::DataTypeId::kVarchar},
           {"postCount", common::DataTypeId::kInt32}});
   function->bindFunc = bind_ic6;

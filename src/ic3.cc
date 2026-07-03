@@ -140,29 +140,18 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic3(
   }
 
   auto input = std::make_unique<IC3FuncInput>();
-  for (size_t i = 0; i < 5; ++i) {
-    if (!params[static_cast<int>(i)].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic3: all arguments must be literals");
-    }
-  }
-
-  input->person_id = parse_i64_arg(params[0].const_(), "personId");
-  input->country_x_name = parse_string_arg(params[1].const_(), "countryXName");
-  input->country_y_name = parse_string_arg(params[2].const_(), "countryYName");
-  input->start_date_ms = parse_i64_arg(params[3].const_(), "startDate");
-  input->duration_days = parse_i64_arg(params[4].const_(), "durationDays");
-
-  const auto& physical_op = plan.plan(op_idx);
-  input->output_aliases.reserve(physical_op.meta_data_size());
-  for (int i = 0; i < physical_op.meta_data_size(); ++i) {
-    input->output_aliases.push_back(physical_op.meta_data(i).alias());
-  }
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic3(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& ic3_input = dynamic_cast<const IC3FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const std::string country_x_name = params.at("countryXName").GetValue<std::string>();
+  const std::string country_y_name = params.at("countryYName").GetValue<std::string>();
+  const int64_t start_date_ms = params.at("startDate").GetValue<int64_t>();
+  const int64_t duration_days = params.at("durationDays").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -193,7 +182,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
 
   vid_t root = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(ic3_input.person_id),
+                            execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -204,10 +193,10 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
   for (auto it = place_set.begin(); it != place_set.end(); ++it) {
     const vid_t place_vid = *it;
     const auto name = place_name_col->get_view(place_vid);
-    if (name == ic3_input.country_x_name) {
+    if (name == country_x_name) {
       country_x = place_vid;
     }
-    if (name == ic3_input.country_y_name) {
+    if (name == country_y_name) {
       country_y = place_vid;
     }
   }
@@ -296,10 +285,10 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
       count_edges(comment_in_country, country_y);
 
   const int64_t end_date_ms =
-      ic3_input.start_date_ms + ic3_input.duration_days * kMillisPerDay;
+      start_date_ms + duration_days * kMillisPerDay;
 
   auto in_date_range = [&](int64_t creation_ms) {
-    return creation_ms >= ic3_input.start_date_ms &&
+    return creation_ms >= start_date_ms &&
            creation_ms < end_date_ms;
   };
 
@@ -383,7 +372,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
                                       const CsrView& located_in_view) {
         ldbc::foreach_incoming_nbr_between_half_open(
             graph, person_label, message_label, has_creator_label, friend_vid,
-            ic3_input.start_date_ms, end_date_ms,
+            start_date_ms, end_date_ms,
             [&](vid_t message_vid, const DateTime& /*creation_date*/) {
               const vid_t locate =
                   get_single_out_neighbor(located_in_view, message_vid);
@@ -473,7 +462,7 @@ function::function_set IC3Function::getFunctionSet() {
           common::DataTypeId::kInt64, common::DataTypeId::kVarchar,
           common::DataTypeId::kVarchar, common::DataTypeId::kInt64,
           common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"personFirstName", common::DataTypeId::kVarchar},
           {"personLastName", common::DataTypeId::kVarchar},

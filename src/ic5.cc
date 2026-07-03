@@ -104,21 +104,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic5(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic5 requires 2 arguments: personId and minDate");
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic5: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC5FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->min_date_ms = ldbc::parse_i64_arg(params[1].const_(), "minDate");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic5(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& ic5_input = dynamic_cast<const IC5FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t min_date_ms = params.at("minDate").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -138,7 +133,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
 
   vid_t root = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(ic5_input.person_id),
+                            execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -156,7 +151,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
       person_label, post_label, has_creator_label);
   const auto forum_container_of_post_in = graph.GetGenericIncomingGraphView(
       post_label, forum_label, container_of_label);
-  const DateTime min_date(ic5_input.min_date_ms);
+  const DateTime min_date(min_date_ms);
 
   std::vector<vid_t> friends_list;
   collect_knows_1d_2d_neighbors(graph, person_label, knows_label, root,
@@ -290,7 +285,7 @@ function::function_set IC5Function::getFunctionSet() {
       IC5Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"forumTitle", common::DataTypeId::kVarchar},
           {"postCount", common::DataTypeId::kInt32}});
   function->bindFunc = bind_ic5;

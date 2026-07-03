@@ -84,22 +84,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic10(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic10 requires 2 arguments: personId and month");
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic10: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC10FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->month = static_cast<int32_t>(
-      ldbc::parse_i64_arg(params[1].const_(), "month"));
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic10(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface) {
+                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC10FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int32_t month = params.at("month").GetValue<int32_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -129,7 +123,7 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(args.person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -145,7 +139,7 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
   std::vector<vid_t> friends;
   ldbc::foreach_knows_2d_neighbor(
       graph, person_label, knows_label, root, [&](vid_t v) {
-        if (matches_zodiac_month(birthday_col->get_view(v), args.month)) {
+        if (matches_zodiac_month(birthday_col->get_view(v), month)) {
           friends.push_back(v);
         }
       });
@@ -261,7 +255,7 @@ function::function_set IC10Function::getFunctionSet() {
       IC10Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"personFirstName", common::DataTypeId::kVarchar},
           {"personLastName", common::DataTypeId::kVarchar},

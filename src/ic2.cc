@@ -148,28 +148,15 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic2(
   }
 
   auto input = std::make_unique<IC2FuncInput>();
-  if (!params[0].has_const_()) {
-    THROW_INVALID_ARGUMENT_EXCEPTION(
-        "ic2: personId must be an integer literal");
-  }
-  if (!params[1].has_const_()) {
-    THROW_INVALID_ARGUMENT_EXCEPTION(
-        "ic2: maxDate must be a timestamp in epoch milliseconds");
-  }
-  input->person_id = parse_i64_arg(params[0].const_(), "personId");
-  input->max_date_ms = parse_i64_arg(params[1].const_(), "maxDate");
-
-  const auto& physical_op = plan.plan(op_idx);
-  input->output_aliases.reserve(physical_op.meta_data_size());
-  for (int i = 0; i < physical_op.meta_data_size(); ++i) {
-    input->output_aliases.push_back(physical_op.meta_data(i).alias());
-  }
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic2(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& ic2_input = dynamic_cast<const IC2FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t max_date_ms = params.at("maxDate").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -199,7 +186,7 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
 
   vid_t root = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(ic2_input.person_id),
+                            execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -211,11 +198,11 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
                            scan_messages_for_friend(
                                graph, person_label, post_label,
                                has_creator_label, true, friend_vid,
-                               ic2_input.max_date_ms, pq);
+                               max_date_ms, pq);
                            scan_messages_for_friend(
                                graph, person_label, comment_label,
                                has_creator_label, false, friend_vid,
-                               ic2_input.max_date_ms, pq);
+                               max_date_ms, pq);
                          });
 
   std::vector<MessageInfo> results;
@@ -288,7 +275,7 @@ function::function_set IC2Function::getFunctionSet() {
       IC2Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"personFirstName", common::DataTypeId::kVarchar},
           {"personLastName", common::DataTypeId::kVarchar},

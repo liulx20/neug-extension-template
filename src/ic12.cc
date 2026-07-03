@@ -89,22 +89,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic12(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic12 requires 2 arguments: personId and tagClassName");
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic12: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC12FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->tag_class_name =
-      ldbc::parse_string_arg(params[1].const_(), "tagClassName");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic12(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface) {
+                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC12FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const std::string tag_class_name = params.at("tagClassName").GetValue<std::string>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -131,13 +125,13 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(args.person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
 
   const vid_t tag_class_vid = ldbc::find_vertex_by_string_prop(
-      graph, tag_class_label, "name", args.tag_class_name);
+      graph, tag_class_label, "name", tag_class_name);
   if (tag_class_vid == StorageReadInterface::kInvalidVid) {
     return execution::Context{};
   }
@@ -257,42 +251,21 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
        reply_count_builder.finish()});
 }
 
-std::unique_ptr<function::TableFuncBindData> bind_ic12_catalog(
-    main::ClientContext* /*client_context*/,
-    const function::TableFuncBindInput* input) {
-  auto* binder = input->binder;
-  binder::expression_vector cols;
-  cols.push_back(binder->createVariable(
-      "personId", common::DataType(common::DataTypeId::kInt64)));
-  cols.push_back(binder->createVariable(
-      "personFirstName", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "personLastName", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "tagNames",
-      common::DataType(common::DataTypeId::kList,
-                       std::make_shared<common::ListTypeInfo>(
-                           common::DataType(common::DataTypeId::kVarchar)))));
-  cols.push_back(binder->createVariable(
-      "replyCount", common::DataType(common::DataTypeId::kInt32)));
-  return std::make_unique<function::TableFuncBindData>(
-      std::move(cols), cols.size(), input->params);
-}
-
 }  // namespace
 
 function::function_set IC12Function::getFunctionSet() {
+  const auto tag_names_list_type = common::DataType::List(
+      common::DataType(common::DataTypeId::kVarchar));
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC12Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kVarchar},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"tagNames", common::DataTypeId::kList},
-          {"replyCount", common::DataTypeId::kInt32}});
-  static_cast<function::TableFunction*>(fn.get())->bindFunc = bind_ic12_catalog;
+      function::call_output_columns{
+          function::call_output("personId", common::DataTypeId::kInt64),
+          function::call_output("personFirstName", common::DataTypeId::kVarchar),
+          function::call_output("personLastName", common::DataTypeId::kVarchar),
+          function::call_output("tagNames", tag_names_list_type),
+          function::call_output("replyCount", common::DataTypeId::kInt32)});
   fn->bindFunc = bind_ic12;
   fn->execFunc = exec_ic12;
   function::function_set set;

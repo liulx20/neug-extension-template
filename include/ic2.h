@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "neug/compiler/function/function.h"
+#include "ldbc_common.h"
 #include "neug/compiler/function/neug_call_function.h"
 #include "neug/execution/common/context.h"
 #include "neug/storages/graph/graph_interface.h"
@@ -28,11 +29,7 @@ namespace neug {
 namespace extension {
 namespace ldbc_ic {
 
-struct IC2FuncInput : public function::CallFuncInputBase {
-  int64_t person_id = 0;
-  int64_t max_date_ms = 0;
-  std::vector<int> output_aliases;
-};
+struct IC2FuncInput : ldbc::LdbcCallInput {};
 
 struct IC2Function {
   static constexpr const char* name = "ic2";

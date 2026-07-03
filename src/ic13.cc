@@ -37,15 +37,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic13(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic13 requires 2 arguments: person1Id and person2Id");
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic13: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC13FuncInput>();
-  input->person1_id = ldbc::parse_i64_arg(params[0].const_(), "person1Id");
-  input->person2_id = ldbc::parse_i64_arg(params[1].const_(), "person2Id");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
@@ -92,8 +85,10 @@ int32_t shortest_path_length(const StorageReadInterface& graph,
 }
 
 execution::Context exec_ic13(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface) {
+                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC13FuncInput&>(input);
+  const int64_t person1_id = params.at("person1Id").GetValue<int64_t>();
+  const int64_t person2_id = params.at("person2Id").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -104,9 +99,9 @@ execution::Context exec_ic13(const function::CallFuncInputBase& input,
   vid_t dst = StorageReadInterface::kInvalidVid;
   int32_t result = 0;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(args.person1_id), src) ||
+                            execution::Value::INT64(person1_id), src) ||
       !graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(args.person2_id), dst)) {
+                            execution::Value::INT64(person2_id), dst)) {
     result = -1;
   } else {
     result = shortest_path_length(graph, person_label, knows_label, src, dst);
@@ -124,7 +119,7 @@ function::function_set IC13Function::getFunctionSet() {
       IC13Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"shortestPathLength", common::DataTypeId::kInt32}});
   fn->bindFunc = bind_ic13;
   fn->execFunc = exec_ic13;

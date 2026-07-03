@@ -70,22 +70,17 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic4(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic4 requires 3 arguments: personId, startDate, durationDays");
   }
-  for (int i = 0; i < 3; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic4: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC4FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->start_date_ms = ldbc::parse_i64_arg(params[1].const_(), "startDate");
-  input->duration_days = ldbc::parse_i64_arg(params[2].const_(), "durationDays");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic4(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC4FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t start_date_ms = params.at("startDate").GetValue<int64_t>();
+  const int64_t duration_days = params.at("durationDays").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -103,12 +98,12 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(args.person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
 
-  const int64_t end_ms = args.start_date_ms + args.duration_days * kMillisPerDay;
+  const int64_t end_ms = start_date_ms + duration_days * kMillisPerDay;
 
   const auto post_in = graph.GetGenericIncomingGraphView(
       person_label, post_label, has_creator_label);
@@ -135,7 +130,7 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
             continue;
           }
           const auto tags = post_tag_out.get_edges(post_vid);
-          if (created >= args.start_date_ms) {
+          if (created >= start_date_ms) {
             for (auto tit = tags.begin(); tit != tags.end(); ++tit) {
               const vid_t tag_vid = *tit;
               if (tag_vid < tag_num && !neg[tag_vid]) {
@@ -192,7 +187,7 @@ function::function_set IC4Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"tagName", common::DataTypeId::kVarchar},
           {"postCount", common::DataTypeId::kInt32}});
   fn->bindFunc = bind_ic4;

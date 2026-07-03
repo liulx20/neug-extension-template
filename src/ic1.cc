@@ -230,21 +230,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic1(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic1 requires 2 arguments: personId and firstName");
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic1: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC1FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->first_name = ldbc::parse_string_arg(params[1].const_(), "firstName");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic1(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC1FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const std::string first_name = params.at("firstName").GetValue<std::string>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -285,13 +280,13 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(args.person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
 
   std::vector<PersonResult> results;
-  collect_friends(graph, person_label, knows_label, root, args.first_name,
+  collect_friends(graph, person_label, knows_label, root, first_name,
                   *first_name_col, *last_name_col, &results);
   if (results.empty()) {
     return execution::Context{};
@@ -445,64 +440,30 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
        companies_builder.finish()});
 }
 
-std::unique_ptr<function::TableFuncBindData> bind_ic1_catalog(
-    main::ClientContext* /*client_context*/,
-    const function::TableFuncBindInput* input) {
-  auto* binder = input->binder;
-  const auto university_list_type = common::DataType::List(kOrgPlaceTupleCatalogType);
-  const auto company_list_type = common::DataType::List(kOrgPlaceTupleCatalogType);
-  binder::expression_vector cols;
-  cols.push_back(binder->createVariable(
-      "friendId", common::DataType(common::DataTypeId::kInt64)));
-  cols.push_back(binder->createVariable(
-      "distanceFromPerson", common::DataType(common::DataTypeId::kInt32)));
-  cols.push_back(binder->createVariable(
-      "friendLastName", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "friendBirthday", common::DataType(common::DataTypeId::kDate)));
-  cols.push_back(binder->createVariable(
-      "friendCreationDate", common::DataType(common::DataTypeId::kTimestampMs)));
-  cols.push_back(binder->createVariable(
-      "friendGender", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "friendBrowserUsed", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "friendLocationIp", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "friendCityName", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "friendEmail", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(binder->createVariable(
-      "friendLanguage", common::DataType(common::DataTypeId::kVarchar)));
-  cols.push_back(
-      binder->createVariable("friendUniversities", university_list_type));
-  cols.push_back(binder->createVariable("friendCompanies", company_list_type));
-  return std::make_unique<function::TableFuncBindData>(
-      std::move(cols), cols.size(), input->params);
-}
-
 }  // namespace
 
 function::function_set IC1Function::getFunctionSet() {
+  const auto kOrgPlaceListType =
+      common::DataType::List(kOrgPlaceTupleCatalogType);
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC1Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kVarchar},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
-          {"friendId", common::DataTypeId::kInt64},
-          {"distanceFromPerson", common::DataTypeId::kInt32},
-          {"friendLastName", common::DataTypeId::kVarchar},
-          {"friendBirthday", common::DataTypeId::kDate},
-          {"friendCreationDate", common::DataTypeId::kTimestampMs},
-          {"friendGender", common::DataTypeId::kVarchar},
-          {"friendBrowserUsed", common::DataTypeId::kVarchar},
-          {"friendLocationIp", common::DataTypeId::kVarchar},
-          {"friendCityName", common::DataTypeId::kVarchar},
-          {"friendEmail", common::DataTypeId::kVarchar},
-          {"friendLanguage", common::DataTypeId::kVarchar},
-          {"friendUniversities", common::DataTypeId::kList},
-          {"friendCompanies", common::DataTypeId::kList}});
-  static_cast<function::TableFunction*>(fn.get())->bindFunc = bind_ic1_catalog;
+      function::call_output_columns{
+          function::call_output("friendId", common::DataTypeId::kInt64),
+          function::call_output("distanceFromPerson", common::DataTypeId::kInt32),
+          function::call_output("friendLastName", common::DataTypeId::kVarchar),
+          function::call_output("friendBirthday", common::DataTypeId::kDate),
+          function::call_output("friendCreationDate",
+                                common::DataTypeId::kTimestampMs),
+          function::call_output("friendGender", common::DataTypeId::kVarchar),
+          function::call_output("friendBrowserUsed", common::DataTypeId::kVarchar),
+          function::call_output("friendLocationIp", common::DataTypeId::kVarchar),
+          function::call_output("friendCityName", common::DataTypeId::kVarchar),
+          function::call_output("friendEmail", common::DataTypeId::kVarchar),
+          function::call_output("friendLanguage", common::DataTypeId::kVarchar),
+          function::call_output("friendUniversities", kOrgPlaceListType),
+          function::call_output("friendCompanies", kOrgPlaceListType)});
   fn->bindFunc = bind_ic1;
   fn->execFunc = exec_ic1;
   function::function_set set;

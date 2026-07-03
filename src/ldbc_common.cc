@@ -16,33 +16,15 @@
 
 #include "ldbc_common.h"
 
-#include <string>
-
 #include "neug/execution/common/context_chunk.h"
-#include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc {
 
-int64_t parse_i64_arg(const ::common::Value& value, const char* arg_name) {
-  if (value.has_i64()) {
-    return value.i64();
-  }
-  if (value.has_i32()) {
-    return value.i32();
-  }
-  THROW_INVALID_ARGUMENT_EXCEPTION(
-      std::string("ldbc: argument ") + arg_name + " must be an integer");
-}
-
-std::string parse_string_arg(const ::common::Value& value,
-                             const char* arg_name) {
-  if (value.has_str()) {
-    return value.str();
-  }
-  THROW_INVALID_ARGUMENT_EXCEPTION(
-      std::string("ldbc: argument ") + arg_name + " must be a string");
+void bind_ldbc_call(const ::physical::PhysicalPlan& plan, int op_idx,
+                    LdbcCallInput* input) {
+  bind_output_aliases(plan, op_idx, &input->output_aliases);
 }
 
 void bind_output_aliases(const ::physical::PhysicalPlan& plan, int op_idx,

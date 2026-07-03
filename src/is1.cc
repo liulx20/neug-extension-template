@@ -34,18 +34,15 @@ std::unique_ptr<function::CallFuncInputBase> bind_is1(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
-  if (params.size() < 1 || !params[0].has_const_()) {
-    THROW_INVALID_ARGUMENT_EXCEPTION("is1: personId must be an integer literal");
-  }
   auto input = std::make_unique<IS1FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is1(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& is1_input = dynamic_cast<const IS1FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -75,7 +72,7 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
 
   vid_t person_vid = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(is1_input.person_id),
+                            execution::Value::INT64(person_id),
                             person_vid)) {
     return execution::Context{};
   }
@@ -134,7 +131,7 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
 function::function_set IS1Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS1Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"firstName", common::DataTypeId::kVarchar},
           {"lastName", common::DataTypeId::kVarchar},
           {"birthday", common::DataTypeId::kDate},

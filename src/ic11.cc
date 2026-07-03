@@ -63,23 +63,17 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic11(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic11 requires 3 arguments: personId, countryName, workFromYear");
   }
-  for (int i = 0; i < 3; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic11: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC11FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->country_name = ldbc::parse_string_arg(params[1].const_(), "countryName");
-  input->work_from_year =
-      static_cast<int32_t>(ldbc::parse_i64_arg(params[2].const_(), "workFromYear"));
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic11(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface) {
+                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC11FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const std::string country_name = params.at("countryName").GetValue<std::string>();
+  const int32_t work_from_year = params.at("workFromYear").GetValue<int32_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -101,13 +95,13 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(args.person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
 
   const vid_t country_vid = ldbc::find_vertex_by_string_prop(
-      graph, place_label, "name", args.country_name);
+      graph, place_label, "name", country_name);
   if (country_vid == StorageReadInterface::kInvalidVid) {
     return execution::Context{};
   }
@@ -141,7 +135,7 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
       if (has_work_from) {
         work_from = work_from_accessor.get_typed_data<int32_t>(wit);
       }
-      if (work_from >= args.work_from_year) {
+      if (work_from >= work_from_year) {
         continue;
       }
       if (person_vid >= friends.size() || !friends[person_vid]) {
@@ -205,7 +199,7 @@ function::function_set IC11Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kVarchar,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"personFirstName", common::DataTypeId::kVarchar},
           {"personLastName", common::DataTypeId::kVarchar},

@@ -120,18 +120,15 @@ std::unique_ptr<function::CallFuncInputBase> bind_is2(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
-  if (params.size() < 1 || !params[0].has_const_()) {
-    THROW_INVALID_ARGUMENT_EXCEPTION("is2: personId must be an integer literal");
-  }
   auto input = std::make_unique<IS2FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is2(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& is2_input = dynamic_cast<const IS2FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -151,7 +148,7 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
 
   vid_t person_vid = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(is2_input.person_id),
+                            execution::Value::INT64(person_id),
                             person_vid)) {
     return execution::Context{};
   }
@@ -198,7 +195,7 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
 
     if (row.is_post) {
       original_post_id_builder.push_back_opt(row.message_id);
-      original_post_author_id_builder.push_back_opt(is2_input.person_id);
+      original_post_author_id_builder.push_back_opt(person_id);
       original_post_author_first_builder.push_back_opt(
           std::string(first_name_col->get_view(person_vid)));
       original_post_author_last_builder.push_back_opt(
@@ -243,7 +240,7 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
 function::function_set IS2Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS2Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"messageId", common::DataTypeId::kInt64},
           {"messageContent", common::DataTypeId::kVarchar},
           {"messageCreationDate", common::DataTypeId::kTimestampMs},

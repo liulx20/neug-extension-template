@@ -127,21 +127,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic9(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic9 requires 2 arguments: personId and maxDate");
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic9: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC9FuncInput>();
-  input->person_id = ldbc::parse_i64_arg(params[0].const_(), "personId");
-  input->max_date_ms = ldbc::parse_i64_arg(params[1].const_(), "maxDate");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic9(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC9FuncInput&>(input);
+  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t max_date_ms = params.at("maxDate").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -164,7 +159,7 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(args.person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -179,10 +174,10 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
   ldbc::foreach_knows_1d_2d_neighbor(
       graph, person_label, knows_label, root, [&](vid_t friend_vid) {
         scan_messages(graph, person_label, post_label, has_creator_label, true,
-                      friend_vid, args.max_date_ms, post_edge_date,
+                      friend_vid, max_date_ms, post_edge_date,
                       post_date_col.get(), pq);
         scan_messages(graph, person_label, comment_label, has_creator_label,
-                      false, friend_vid, args.max_date_ms, comment_edge_date,
+                      false, friend_vid, max_date_ms, comment_edge_date,
                       comment_date_col.get(), pq);
       });
 
@@ -228,7 +223,7 @@ function::function_set IC9Function::getFunctionSet() {
       IC9Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"personFirstName", common::DataTypeId::kVarchar},
           {"personLastName", common::DataTypeId::kVarchar},

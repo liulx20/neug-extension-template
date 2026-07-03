@@ -20,17 +20,14 @@
 #include <vector>
 
 #include "neug/compiler/function/function.h"
+#include "ldbc_common.h"
 #include "neug/compiler/function/neug_call_function.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
 
-struct IC12FuncInput : public function::CallFuncInputBase {
-  int64_t person_id = 0;
-  std::string tag_class_name;
-  std::vector<int> output_aliases;
-};
+struct IC12FuncInput : ldbc::LdbcCallInput {};
 
 struct IC12Function {
   static constexpr const char* name = "ic12";

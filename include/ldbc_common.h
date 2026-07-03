@@ -21,7 +21,9 @@
 #include <utility>
 #include <vector>
 
+#include "neug/compiler/function/neug_call_function.h"
 #include "neug/execution/common/context.h"
+#include "neug/execution/common/params_map.h"
 #include "neug/storages/csr/csr_view.h"
 #include "neug/storages/graph/graph_interface.h"
 #include "neug/utils/property/types.h"
@@ -30,8 +32,12 @@ namespace neug {
 namespace extension {
 namespace ldbc {
 
-int64_t parse_i64_arg(const ::common::Value& value, const char* arg_name);
-std::string parse_string_arg(const ::common::Value& value, const char* arg_name);
+struct LdbcCallInput : function::CallFuncInputBase {
+  std::vector<int> output_aliases;
+};
+
+void bind_ldbc_call(const ::physical::PhysicalPlan& plan, int op_idx,
+                    LdbcCallInput* input);
 
 template <typename T>
 inline std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(

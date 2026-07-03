@@ -391,21 +391,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic14(
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic14 requires 2 arguments: person1Id and person2Id");
   }
-  for (int i = 0; i < 2; ++i) {
-    if (!params[i].has_const_()) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic14: all arguments must be literals");
-    }
-  }
   auto input = std::make_unique<IC14FuncInput>();
-  input->person1_id = ldbc::parse_i64_arg(params[0].const_(), "person1Id");
-  input->person2_id = ldbc::parse_i64_arg(params[1].const_(), "person2Id");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_ic14(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface) {
+                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC14FuncInput&>(input);
+  const int64_t person1_id = params.at("person1Id").GetValue<int64_t>();
+  const int64_t person2_id = params.at("person2Id").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -419,9 +414,9 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
   vid_t src = StorageReadInterface::kInvalidVid;
   vid_t dst = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(args.person1_id), src) ||
+                            execution::Value::INT64(person1_id), src) ||
       !graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(args.person2_id), dst)) {
+                            execution::Value::INT64(person2_id), dst)) {
     return execution::Context{};
   }
 
@@ -561,33 +556,18 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
       {path_ids_builder.finish(), weight_builder.finish()});
 }
 
-std::unique_ptr<function::TableFuncBindData> bind_ic14_catalog(
-    main::ClientContext* /*client_context*/,
-    const function::TableFuncBindInput* input) {
-  auto* binder = input->binder;
-  binder::expression_vector cols;
-  cols.push_back(binder->createVariable(
-      "personIdsInPath",
-      common::DataType(common::DataTypeId::kList,
-                       std::make_shared<common::ListTypeInfo>(
-                           common::DataType(common::DataTypeId::kInt64)))));
-  cols.push_back(binder->createVariable(
-      "pathWeight", common::DataType(common::DataTypeId::kDouble)));
-  return std::make_unique<function::TableFuncBindData>(
-      std::move(cols), cols.size(), input->params);
-}
-
 }  // namespace
 
 function::function_set IC14Function::getFunctionSet() {
+  const auto person_ids_in_path_type = common::DataType::List(
+      common::DataType(common::DataTypeId::kInt64));
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC14Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
-          {"personIdsInPath", common::DataTypeId::kList},
-          {"pathWeight", common::DataTypeId::kDouble}});
-  static_cast<function::TableFunction*>(fn.get())->bindFunc = bind_ic14_catalog;
+      function::call_output_columns{
+          function::call_output("personIdsInPath", person_ids_in_path_type),
+          function::call_output("pathWeight", common::DataTypeId::kDouble)});
   fn->bindFunc = bind_ic14;
   fn->execFunc = exec_ic14;
   function::function_set set;

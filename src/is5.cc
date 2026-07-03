@@ -33,18 +33,15 @@ std::unique_ptr<function::CallFuncInputBase> bind_is5(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
-  if (params.size() < 1 || !params[0].has_const_()) {
-    THROW_INVALID_ARGUMENT_EXCEPTION("is5: messageId must be an integer literal");
-  }
   auto input = std::make_unique<IS5FuncInput>();
-  input->message_id = ldbc::parse_i64_arg(params[0].const_(), "messageId");
-  ldbc::bind_output_aliases(plan, op_idx, &input->output_aliases);
+  ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is5(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
+                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
   const auto& is5_input = dynamic_cast<const IS5FuncInput&>(input);
+  const int64_t message_id = params.at("messageId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -64,7 +61,7 @@ execution::Context exec_is5(const function::CallFuncInputBase& input,
   vid_t message_vid = StorageReadInterface::kInvalidVid;
   bool is_post = false;
   if (!ldbc::find_message_vertex(graph, post_label, comment_label,
-                                 is5_input.message_id, &message_vid,
+                                 message_id, &message_vid,
                                  &is_post)) {
     return execution::Context{};
   }
@@ -104,7 +101,7 @@ execution::Context exec_is5(const function::CallFuncInputBase& input,
 function::function_set IS5Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS5Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
-      std::vector<std::pair<std::string, common::DataTypeId>>{
+      function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"firstName", common::DataTypeId::kVarchar},
           {"lastName", common::DataTypeId::kVarchar}});
