@@ -70,6 +70,8 @@ void collect_likes(
     label_t person_label, label_t message_label, label_t likes_label,
     label_t has_creator_label, bool is_post, vid_t root,
     const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,
+    const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
+    const StorageReadInterface::vertex_column_t<int64_t>& person_id_col,
     std::vector<LikeResult>* messages) {
   const auto message_has_creator_in = graph.GetGenericIncomingGraphView(
       person_label, message_label, has_creator_label);
@@ -93,15 +95,13 @@ void collect_likes(
   const auto root_messages = message_has_creator_in.get_edges(root);
   for (auto it = root_messages.begin(); it != root_messages.end(); ++it) {
     const vid_t message_vid = *it;
-    const int64_t message_id =
-        graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+    const int64_t message_id = message_id_col.get_view(message_vid);
     const auto likes = person_likes_message_in.get_edges(message_vid);
     for (auto like_it = likes.begin(); like_it != likes.end(); ++like_it) {
       LikeResult info;
       info.person_vid = *like_it;
       info.message_vid = message_vid;
-      info.person_id =
-          graph.GetVertexId(person_label, info.person_vid).GetValue<int64_t>();
+      info.person_id = person_id_col.get_view(info.person_vid);
       info.message_id = message_id;
       info.is_post = is_post;
       if (has_like_date) {
@@ -139,6 +139,9 @@ execution::Context exec_ic7(const function::CallFuncInputBase& input,
       ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
   auto comment_creation_date_col =
       ldbc::get_vertex_column<DateTime>(graph, comment_label, "creationDate");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+  auto post_id_col = ldbc::get_vertex_column<int64_t>(graph, post_label, "id");
+  auto comment_id_col = ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
   if (!first_name_col || !last_name_col) {
     THROW_RUNTIME_ERROR("ic7: failed to load required LDBC property columns");
   }
@@ -166,10 +169,10 @@ execution::Context exec_ic7(const function::CallFuncInputBase& input,
   std::vector<LikeResult> messages;
   collect_likes(graph, schema, person_label, post_label, likes_label,
                 has_creator_label, true, root, post_creation_date_col.get(),
-                &messages);
+                *post_id_col, *person_id_col, &messages);
   collect_likes(graph, schema, person_label, comment_label, likes_label,
                 has_creator_label, false, root, comment_creation_date_col.get(),
-                &messages);
+                *comment_id_col, *person_id_col, &messages);
 
   std::sort(messages.begin(), messages.end(),
             [](const LikeResult& lhs, const LikeResult& rhs) {

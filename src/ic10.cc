@@ -119,6 +119,7 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
       ldbc::get_vertex_column<Date>(graph, person_label, "birthday");
   auto place_name_col =
       ldbc::get_vertex_column<std::string_view>(graph, place_label, "name");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   if (!first_name_col || !last_name_col || !gender_col || !birthday_col ||
       !place_name_col) {
     THROW_RUNTIME_ERROR("ic10: failed to load required LDBC property columns");
@@ -163,7 +164,7 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
     const int score = score_friend_posts(graph, v, post_has_creator_in,
                                          post_has_tag_out, has_interests);
     pq.push(PersonResult{
-        score, v, graph.GetVertexId(person_label, v).GetValue<int64_t>()});
+        score, v, person_id_col->get_view(v)});
   }
 
   int min_score = pq.empty() ? 0 : pq.top().score;
@@ -192,16 +193,16 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
     }
     if (pq.size() < kTopN) {
       pq.push(PersonResult{
-          score, v, graph.GetVertexId(person_label, v).GetValue<int64_t>()});
+          score, v, person_id_col->get_view(v)});
       min_score = pq.top().score;
     } else if (score > min_score) {
       pq.pop();
       pq.push(PersonResult{
-          score, v, graph.GetVertexId(person_label, v).GetValue<int64_t>()});
+          score, v, person_id_col->get_view(v)});
       min_score = pq.top().score;
     } else if (score == min_score) {
       const int64_t person_id =
-          graph.GetVertexId(person_label, v).GetValue<int64_t>();
+          person_id_col->get_view(v);
       if (person_id < pq.top().person_id) {
         pq.pop();
         pq.push(PersonResult{score, v, person_id});

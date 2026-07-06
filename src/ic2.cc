@@ -86,8 +86,8 @@ void foreach_knows_neighbor(const StorageReadInterface& graph,
 }
 
 void scan_messages_for_friend(
-    const StorageReadInterface& graph,
-    const ldbc::DateTimeIncomingView& has_creator_in, label_t message_label,
+    const ldbc::DateTimeIncomingView& has_creator_in,
+    const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
     bool is_post, vid_t friend_vid, int64_t& min_date_ms, int64_t max_date_ms,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                         MessageInfoComparer>& pq) {
@@ -99,8 +99,7 @@ void scan_messages_for_friend(
           return;
         }
         if (pq.size() < kTopN) {
-          const int64_t message_id =
-              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          const int64_t message_id = message_id_col.get_view(message_vid);
           pq.push(MessageInfo{message_vid, friend_vid, message_id,
                               creation_date_ms, is_post});
           if (pq.size() == kTopN) {
@@ -110,8 +109,7 @@ void scan_messages_for_friend(
         }
 
         if (creation_date_ms > min_date_ms) {
-          const int64_t message_id =
-              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          const int64_t message_id = message_id_col.get_view(message_vid);
           pq.pop();
           pq.push(MessageInfo{message_vid, friend_vid, message_id,
                               creation_date_ms, is_post});
@@ -120,8 +118,7 @@ void scan_messages_for_friend(
         }
 
         if (creation_date_ms == min_date_ms) {
-          const int64_t message_id =
-              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          const int64_t message_id = message_id_col.get_view(message_vid);
           if (message_id < pq.top().message_id) {
             pq.pop();
             pq.push(MessageInfo{message_vid, friend_vid, message_id,
@@ -173,6 +170,9 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
       get_vertex_column<int32_t>(graph, post_label, "length");
   auto comment_content_col =
       get_vertex_column<std::string_view>(graph, comment_label, "content");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+  auto post_id_col = ldbc::get_vertex_column<int64_t>(graph, post_label, "id");
+  auto comment_id_col = ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
 
   vid_t root = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
@@ -191,11 +191,10 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
   int64_t min_date_ms = 0;
   foreach_knows_neighbor(
       graph, person_label, knows_label, root, [&](vid_t friend_vid) {
-        scan_messages_for_friend(graph, post_has_creator_in, post_label, true,
+        scan_messages_for_friend(post_has_creator_in, *post_id_col, true,
                                  friend_vid, min_date_ms, max_date_ms, pq);
-        scan_messages_for_friend(graph, comment_has_creator_in, comment_label,
-                                 false, friend_vid, min_date_ms, max_date_ms,
-                                 pq);
+        scan_messages_for_friend(comment_has_creator_in, *comment_id_col, false,
+                                 friend_vid, min_date_ms, max_date_ms, pq);
       });
 
   std::vector<MessageInfo> results;
@@ -222,7 +221,7 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
   for (size_t i = results.size(); i > 0; --i) {
     const auto& row = results[i - 1];
     person_id_builder.push_back_opt(
-        graph.GetVertexId(person_label, row.person_vid).GetValue<int64_t>());
+        person_id_col->get_view(row.person_vid));
     first_name_builder.push_back_opt(
         std::string(first_name_col->get_view(row.person_vid)));
     last_name_builder.push_back_opt(

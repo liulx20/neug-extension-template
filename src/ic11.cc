@@ -93,6 +93,7 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
       graph, person_label, "lastName");
   auto org_name_col =
       ldbc::get_vertex_column<std::string_view>(graph, org_label, "name");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   if (!first_name_col || !last_name_col || !org_name_col) {
     THROW_RUNTIME_ERROR("ic11: failed to load required LDBC property columns");
   }
@@ -145,7 +146,7 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
         continue;
       }
       const int64_t person_id =
-          graph.GetVertexId(person_label, person_vid).GetValue<int64_t>();
+          person_id_col->get_view(person_vid);
       WorkResult row{person_vid, work_from, person_id, company_name};
       if (pq.size() < kTopN) {
         pq.push(row);

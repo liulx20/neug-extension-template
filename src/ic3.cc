@@ -121,6 +121,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
       get_vertex_column<std::string_view>(graph, person_label, "firstName");
   auto last_name_col =
       get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   auto place_name_col =
       get_vertex_column<std::string_view>(graph, place_label, "name");
   auto post_creation_date_col =
@@ -234,7 +235,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
     row.total = x_count + y_count;
     if (pq.size() < kTopN) {
       row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+          person_id_col->get_view(friend_vid);
 
       pq.push(row);
       continue;
@@ -243,13 +244,13 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
     if (row.total > worst.total) {
       pq.pop();
       row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+          person_id_col->get_view(friend_vid);
       pq.push(row);
       continue;
     }
     if (row.total == worst.total) {
       row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+          person_id_col->get_view(friend_vid);
       if (row.person_id < worst.person_id) {
         pq.pop();
         pq.push(row);

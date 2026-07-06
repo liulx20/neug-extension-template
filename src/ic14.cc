@@ -409,6 +409,8 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
   const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
   const label_t reply_of_label = schema.get_edge_label_id("REPLYOF");
 
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+
   vid_t src = StorageReadInterface::kInvalidVid;
   vid_t dst = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person1_id),
@@ -542,7 +544,7 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
     ids.reserve(paths[idx].size());
     for (vid_t v : paths[idx]) {
       ids.emplace_back(execution::Value::INT64(
-          graph.GetVertexId(person_label, v).GetValue<int64_t>()));
+          person_id_col->get_view(v)));
     }
     path_ids_builder.push_back_elem(
         execution::Value::LIST(DataType(DataTypeId::kInt64), std::move(ids)));

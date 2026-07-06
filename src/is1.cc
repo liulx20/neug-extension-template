@@ -66,6 +66,7 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
       ldbc::get_vertex_column<std::string_view>(graph, person_label, "gender");
   auto creation_date_col =
       ldbc::get_vertex_column<DateTime>(graph, person_label, "creationDate");
+  auto place_id_col = ldbc::get_vertex_column<int64_t>(graph, place_label, "id");
 
   if (!first_name_col || !last_name_col || !birthday_col || !location_ip_col ||
       !browser_used_col || !gender_col || !creation_date_col) {
@@ -84,7 +85,7 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
       ldbc::get_single_out_neighbor(located_in_out, person_vid);
   int64_t city_id = 0;
   if (place_vid != StorageReadInterface::kInvalidVid) {
-    city_id = graph.GetVertexId(place_label, place_vid).GetValue<int64_t>();
+    city_id = place_id_col->get_view(place_vid);
   }
 
   execution::ValueColumnBuilder<std::string> first_name_builder;

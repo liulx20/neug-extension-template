@@ -61,6 +61,8 @@ execution::Context exec_is6(const function::CallFuncInputBase& input,
       graph, person_label, "lastName");
   auto forum_title_col =
       ldbc::get_vertex_column<std::string_view>(graph, forum_label, "title");
+  auto forum_id_col = ldbc::get_vertex_column<int64_t>(graph, forum_label, "id");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   if (!first_name_col || !last_name_col || !forum_title_col) {
     THROW_RUNTIME_ERROR("is6: failed to load required LDBC property columns");
   }
@@ -101,11 +103,11 @@ execution::Context exec_is6(const function::CallFuncInputBase& input,
   execution::ValueColumnBuilder<std::string> moderator_last_builder;
 
   forum_id_builder.push_back_opt(
-      graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
+      forum_id_col->get_view(forum_vid));
   forum_title_builder.push_back_opt(
       std::string(forum_title_col->get_view(forum_vid)));
   moderator_id_builder.push_back_opt(
-      graph.GetVertexId(person_label, moderator_vid).GetValue<int64_t>());
+      person_id_col->get_view(moderator_vid));
   moderator_first_builder.push_back_opt(
       std::string(first_name_col->get_view(moderator_vid)));
   moderator_last_builder.push_back_opt(

@@ -99,6 +99,7 @@ void collect_friends(
         first_name_col,
     const StorageReadInterface::vertex_column_t<std::string_view>&
         last_name_col,
+    const StorageReadInterface::vertex_column_t<int64_t>& person_id_col,
     std::vector<PersonResult>* results) {
   const auto knows_out = graph.GetGenericOutgoingGraphView(
       person_label, person_label, knows_label);
@@ -121,8 +122,7 @@ void collect_friends(
     accessed[v] = true;
     if (first_name_col.get_view(v) == first_name) {
       try_enqueue_friend(&pq, 1, last_name_col.get_view(v),
-                         graph.GetVertexId(person_label, v).GetValue<int64_t>(),
-                         v);
+                         person_id_col.get_view(v), v);
     }
   }
   const auto root_out = knows_out.get_edges(root);
@@ -132,8 +132,7 @@ void collect_friends(
     accessed[v] = true;
     if (first_name_col.get_view(v) == first_name) {
       try_enqueue_friend(&pq, 1, last_name_col.get_view(v),
-                         graph.GetVertexId(person_label, v).GetValue<int64_t>(),
-                         v);
+                         person_id_col.get_view(v), v);
     }
   }
 
@@ -158,7 +157,7 @@ void collect_friends(
       if (first_name_col.get_view(v) == first_name) {
         try_enqueue_friend(
             &pq, 2, last_name_col.get_view(v),
-            graph.GetVertexId(person_label, v).GetValue<int64_t>(), v);
+            person_id_col.get_view(v), v);
       }
     }
     const auto out_edges = knows_out.get_edges(u);
@@ -172,7 +171,7 @@ void collect_friends(
       if (first_name_col.get_view(v) == first_name) {
         try_enqueue_friend(
             &pq, 2, last_name_col.get_view(v),
-            graph.GetVertexId(person_label, v).GetValue<int64_t>(), v);
+            person_id_col.get_view(v), v);
       }
     }
   }
@@ -197,7 +196,7 @@ void collect_friends(
       if (first_name_col.get_view(v) == first_name) {
         try_enqueue_friend(
             &pq, 3, last_name_col.get_view(v),
-            graph.GetVertexId(person_label, v).GetValue<int64_t>(), v);
+            person_id_col.get_view(v), v);
       }
     }
     const auto out_edges = knows_out.get_edges(u);
@@ -210,7 +209,7 @@ void collect_friends(
       if (first_name_col.get_view(v) == first_name) {
         try_enqueue_friend(
             &pq, 3, last_name_col.get_view(v),
-            graph.GetVertexId(person_label, v).GetValue<int64_t>(), v);
+            person_id_col.get_view(v), v);
       }
     }
   }
@@ -257,6 +256,7 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
       graph, person_label, "firstName");
   auto last_name_col = ldbc::get_vertex_column<std::string_view>(
       graph, person_label, "lastName");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   auto birthday_col =
       ldbc::get_vertex_column<Date>(graph, person_label, "birthday");
   auto creation_date_col =
@@ -289,7 +289,7 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
 
   std::vector<PersonResult> results;
   collect_friends(graph, person_label, knows_label, root, first_name,
-                  *first_name_col, *last_name_col, &results);
+                  *first_name_col, *last_name_col, *person_id_col, &results);
   if (results.empty()) {
     return execution::Context{};
   }

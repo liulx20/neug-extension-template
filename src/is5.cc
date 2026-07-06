@@ -56,6 +56,7 @@ execution::Context exec_is5(const function::CallFuncInputBase& input,
       graph, person_label, "firstName");
   auto last_name_col = ldbc::get_vertex_column<std::string_view>(
       graph, person_label, "lastName");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   if (!first_name_col || !last_name_col) {
     THROW_RUNTIME_ERROR("is5: failed to load required LDBC property columns");
   }
@@ -80,7 +81,7 @@ execution::Context exec_is5(const function::CallFuncInputBase& input,
   execution::ValueColumnBuilder<std::string> first_name_builder;
   execution::ValueColumnBuilder<std::string> last_name_builder;
   person_id_builder.push_back_opt(
-      graph.GetVertexId(person_label, author_vid).GetValue<int64_t>());
+      person_id_col->get_view(author_vid));
   first_name_builder.push_back_opt(
       std::string(first_name_col->get_view(author_vid)));
   last_name_builder.push_back_opt(

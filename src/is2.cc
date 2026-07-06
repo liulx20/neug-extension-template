@@ -75,6 +75,7 @@ void scan_person_messages(
     const StorageReadInterface& graph, const Schema& schema,
     const ldbc::DateTimeIncomingView& has_creator_in, label_t person_label,
     label_t message_label, bool is_post, vid_t person_vid,
+    const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                         MessageInfoComparer>& pq) {
   const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
@@ -89,8 +90,7 @@ void scan_person_messages(
         [&](vid_t message_vid, const DateTime& creation_date) {
           MessageInfo info;
           info.message_vid = message_vid;
-          info.message_id =
-              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          info.message_id = message_id_col.get_view(message_vid);
           info.creation_date_ms = creation_date.milli_second;
           info.is_post = is_post;
           consider_message(pq, info);
@@ -109,8 +109,7 @@ void scan_person_messages(
     }
     MessageInfo info;
     info.message_vid = message_vid;
-    info.message_id =
-        graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+    info.message_id = message_id_col.get_view(message_vid);
     info.creation_date_ms = creation_date_ms;
     info.is_post = is_post;
     consider_message(pq, info);
@@ -145,6 +144,9 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
       graph, person_label, "firstName");
   auto last_name_col = ldbc::get_vertex_column<std::string_view>(
       graph, person_label, "lastName");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+  auto post_id_col = ldbc::get_vertex_column<int64_t>(graph, post_label, "id");
+  auto comment_id_col = ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
   if (!first_name_col || !last_name_col) {
     THROW_RUNTIME_ERROR("is2: failed to load required LDBC property columns");
   }
@@ -164,9 +166,9 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
                       MessageInfoComparer>
       pq;
   scan_person_messages(graph, schema, post_has_creator_in, person_label,
-                       post_label, true, person_vid, pq);
+                       post_label, true, person_vid, *post_id_col, pq);
   scan_person_messages(graph, schema, comment_has_creator_in, person_label,
-                       comment_label, false, person_vid, pq);
+                       comment_label, false, person_vid, *comment_id_col, pq);
 
   std::vector<MessageInfo> results;
   results.reserve(pq.size());
@@ -213,12 +215,12 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
           ldbc::resolve_root_post(graph, post_label, comment_label,
                                   reply_of_label, row.message_vid, false);
       const int64_t post_id =
-          graph.GetVertexId(post_label, post_vid).GetValue<int64_t>();
+          post_id_col->get_view(post_vid);
       original_post_id_builder.push_back_opt(post_id);
       const vid_t author_vid =
           ldbc::get_single_out_neighbor(post_has_creator_out, post_vid);
       original_post_author_id_builder.push_back_opt(
-          graph.GetVertexId(person_label, author_vid).GetValue<int64_t>());
+          person_id_col->get_view(author_vid));
       original_post_author_first_builder.push_back_opt(
           std::string(first_name_col->get_view(author_vid)));
       original_post_author_last_builder.push_back_opt(

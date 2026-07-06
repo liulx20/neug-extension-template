@@ -129,6 +129,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
 
   auto forum_title_col =
       ldbc::get_vertex_column<std::string_view>(graph, forum_label, "title");
+  auto forum_id_col = ldbc::get_vertex_column<int64_t>(graph, forum_label, "id");
   if (!forum_title_col) {
     THROW_RUNTIME_ERROR("ic5: failed to load required LDBC property columns");
   }
@@ -205,7 +206,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
     if (que.size() < kTopN) {
       que.emplace(
           forum_vid, count,
-          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
+          forum_id_col->get_view(forum_vid));
       continue;
     }
     const auto& top = que.top();
@@ -213,10 +214,10 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
       que.pop();
       que.emplace(
           forum_vid, count,
-          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
+          forum_id_col->get_view(forum_vid));
     } else if (top.post_count == count) {
       const int64_t forum_id =
-          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>();
+          forum_id_col->get_view(forum_vid);
       if (forum_id < top.forum_id) {
         que.pop();
         que.emplace(forum_vid, count, forum_id);
@@ -233,12 +234,12 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
       if (que.size() < kTopN) {
         que.emplace(
             forum_vid, 0,
-            graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
+            forum_id_col->get_view(forum_vid));
         continue;
       }
       const auto& top = que.top();
       const int64_t forum_id =
-          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>();
+          forum_id_col->get_view(forum_vid);
       if (forum_id < top.forum_id) {
         que.pop();
         que.emplace(forum_vid, 0, forum_id);

@@ -123,6 +123,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
       graph, person_label, "lastName");
   auto tag_name_col =
       ldbc::get_vertex_column<std::string_view>(graph, tag_label, "name");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   if (!first_name_col || !last_name_col || !tag_name_col) {
     THROW_RUNTIME_ERROR("ic12: failed to load required LDBC property columns");
   }
@@ -179,7 +180,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
         }
         if (pq.size() < kTopN) {
           const int64_t friend_id =
-              graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+              person_id_col->get_view(friend_vid);
           pq.push({count, friend_vid, friend_id});
           if (pq.size() == kTopN) {
             min_count = pq.top().reply_count;
@@ -189,7 +190,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
           pq.pop();
 
           const int64_t friend_id =
-              graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+              person_id_col->get_view(friend_vid);
           pq.push({count, friend_vid, friend_id});
           min_count = pq.top().reply_count;
           return;
@@ -197,7 +198,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
 
         if (count == min_count) {
           const int64_t friend_id =
-              graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+              person_id_col->get_view(friend_vid);
           if (friend_id < pq.top().person_id) {
             pq.pop();
             pq.push({count, friend_vid, friend_id});

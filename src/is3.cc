@@ -62,6 +62,7 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
       graph, person_label, "firstName");
   auto last_name_col = ldbc::get_vertex_column<std::string_view>(
       graph, person_label, "lastName");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   if (!first_name_col || !last_name_col) {
     THROW_RUNTIME_ERROR("is3: failed to load required LDBC property columns");
   }
@@ -90,8 +91,7 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
          it != view.get_edges(root).end(); ++it) {
       FriendInfo info;
       info.person_vid = *it;
-      info.person_id =
-          graph.GetVertexId(person_label, info.person_vid).GetValue<int64_t>();
+      info.person_id = person_id_col->get_view(info.person_vid);
       if (has_edge_date) {
         info.friendship_creation_ms =
             edge_accessor.get_typed_data<DateTime>(it).milli_second;

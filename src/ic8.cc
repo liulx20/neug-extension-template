@@ -83,12 +83,12 @@ void consider_comment(
 }
 
 void scan_replies(
-    const StorageReadInterface& graph, label_t comment_label,
     label_t person_label, label_t has_creator_label,
     const CsrView& reply_in_view, const CsrView& comment_has_creator_out,
     vid_t message_vid, bool has_creator_date,
     const EdgeDataAccessor& creator_accessor,
     const StorageReadInterface::vertex_column_t<DateTime>* comment_date_col,
+    const StorageReadInterface::vertex_column_t<int64_t>& comment_id_col,
     std::priority_queue<CommentResult, std::vector<CommentResult>,
                         CommentResultComparer>& pq) {
   const auto replies = reply_in_view.get_edges(message_vid);
@@ -102,8 +102,7 @@ void scan_replies(
     CommentResult info;
     info.comment_vid = comment_vid;
     info.author_vid = author_vid;
-    info.comment_id =
-        graph.GetVertexId(comment_label, comment_vid).GetValue<int64_t>();
+    info.comment_id = comment_id_col.get_view(comment_vid);
     if (has_creator_date) {
       const auto authors = comment_has_creator_out.get_edges(comment_vid);
       for (auto author_it = authors.begin(); author_it != authors.end();
@@ -142,6 +141,8 @@ execution::Context exec_ic8(const function::CallFuncInputBase& input,
       graph, comment_label, "content");
   auto comment_date_col =
       ldbc::get_vertex_column<DateTime>(graph, comment_label, "creationDate");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+  auto comment_id_col = ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
   if (!first_name_col || !last_name_col || !comment_content_col) {
     THROW_RUNTIME_ERROR("ic8: failed to load required LDBC property columns");
   }
@@ -175,17 +176,15 @@ execution::Context exec_ic8(const function::CallFuncInputBase& input,
       pq;
   const auto root_posts = post_has_creator_in.get_edges(root);
   for (auto it = root_posts.begin(); it != root_posts.end(); ++it) {
-    scan_replies(graph, comment_label, person_label, has_creator_label,
-                 comment_reply_of_post_in, comment_has_creator_out, *it,
-                 has_creator_date, creator_accessor, comment_date_col.get(),
-                 pq);
+    scan_replies(person_label, has_creator_label, comment_reply_of_post_in,
+                 comment_has_creator_out, *it, has_creator_date, creator_accessor,
+                 comment_date_col.get(), *comment_id_col, pq);
   }
   const auto root_comments = comment_has_creator_in.get_edges(root);
   for (auto it = root_comments.begin(); it != root_comments.end(); ++it) {
-    scan_replies(graph, comment_label, person_label, has_creator_label,
-                 comment_reply_of_comment_in, comment_has_creator_out, *it,
-                 has_creator_date, creator_accessor, comment_date_col.get(),
-                 pq);
+    scan_replies(person_label, has_creator_label, comment_reply_of_comment_in,
+                 comment_has_creator_out, *it, has_creator_date, creator_accessor,
+                 comment_date_col.get(), *comment_id_col, pq);
   }
 
   std::vector<CommentResult> results;
@@ -205,7 +204,7 @@ execution::Context exec_ic8(const function::CallFuncInputBase& input,
   for (size_t i = results.size(); i > 0; --i) {
     const auto& row = results[i - 1];
     person_id_builder.push_back_opt(
-        graph.GetVertexId(person_label, row.author_vid).GetValue<int64_t>());
+        person_id_col->get_view(row.author_vid));
     first_name_builder.push_back_opt(
         std::string(first_name_col->get_view(row.author_vid)));
     last_name_builder.push_back_opt(

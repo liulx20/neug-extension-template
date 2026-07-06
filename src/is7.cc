@@ -70,6 +70,8 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
       graph, person_label, "lastName");
   auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
       graph, comment_label, "content");
+  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+  auto comment_id_col = ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
   if (!first_name_col || !last_name_col || !comment_content_col) {
     THROW_RUNTIME_ERROR("is7: failed to load required LDBC property columns");
   }
@@ -118,10 +120,8 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
     ReplyInfo info;
     info.comment_vid = comment_vid;
     info.author_vid = author_vid;
-    info.comment_id =
-        graph.GetVertexId(comment_label, comment_vid).GetValue<int64_t>();
-    info.author_id =
-        graph.GetVertexId(person_label, author_vid).GetValue<int64_t>();
+    info.comment_id = comment_id_col->get_view(comment_vid);
+    info.author_id = person_id_col->get_view(author_vid);
     if (has_edge_date) {
       for (auto author_it =
                comment_has_creator_out.get_edges(comment_vid).begin();
