@@ -66,10 +66,10 @@ const DataType kOrgPlaceTupleType = DataType::Struct(
     {DataType(DataTypeId::kVarchar), DataType(DataTypeId::kInt32),
      DataType(DataTypeId::kVarchar)});
 
-const common::DataType kOrgPlaceTupleCatalogType = common::DataType::Struct(
-    {common::DataType(common::DataTypeId::kVarchar),
-     common::DataType(common::DataTypeId::kInt32),
-     common::DataType(common::DataTypeId::kVarchar)});
+const common::DataType kOrgPlaceTupleCatalogType =
+    common::DataType::Struct({common::DataType(common::DataTypeId::kVarchar),
+                              common::DataType(common::DataTypeId::kInt32),
+                              common::DataType(common::DataTypeId::kVarchar)});
 
 void try_enqueue_friend(
     std::priority_queue<PersonResult, std::vector<PersonResult>,
@@ -120,9 +120,9 @@ void collect_friends(
     d1_friends.push_back(v);
     accessed[v] = true;
     if (first_name_col.get_view(v) == first_name) {
-      try_enqueue_friend(
-          &pq, 1, last_name_col.get_view(v),
-          graph.GetVertexId(person_label, v).GetValue<int64_t>(), v);
+      try_enqueue_friend(&pq, 1, last_name_col.get_view(v),
+                         graph.GetVertexId(person_label, v).GetValue<int64_t>(),
+                         v);
     }
   }
   const auto root_out = knows_out.get_edges(root);
@@ -131,9 +131,9 @@ void collect_friends(
     d1_friends.push_back(v);
     accessed[v] = true;
     if (first_name_col.get_view(v) == first_name) {
-      try_enqueue_friend(
-          &pq, 1, last_name_col.get_view(v),
-          graph.GetVertexId(person_label, v).GetValue<int64_t>(), v);
+      try_enqueue_friend(&pq, 1, last_name_col.get_view(v),
+                         graph.GetVertexId(person_label, v).GetValue<int64_t>(),
+                         v);
     }
   }
 
@@ -225,7 +225,8 @@ void collect_friends(
 std::unique_ptr<function::CallFuncInputBase> bind_ic1(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   if (params.size() < 2) {
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic1 requires 2 arguments: personId and firstName");
@@ -236,7 +237,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic1(
 }
 
 execution::Context exec_ic1(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC1FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const std::string first_name = params.at("firstName").GetValue<std::string>();
@@ -251,24 +253,24 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
   const label_t work_at_label = schema.get_edge_label_id("WORKAT");
   const label_t study_at_label = schema.get_edge_label_id("STUDYAT");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   auto birthday_col =
       ldbc::get_vertex_column<Date>(graph, person_label, "birthday");
   auto creation_date_col =
       ldbc::get_vertex_column<DateTime>(graph, person_label, "creationDate");
   auto gender_col =
       ldbc::get_vertex_column<std::string_view>(graph, person_label, "gender");
-  auto browser_used_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "browserUsed");
-  auto location_ip_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "locationIP");
+  auto browser_used_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "browserUsed");
+  auto location_ip_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "locationIP");
   auto email_col =
       ldbc::get_vertex_column<std::string_view>(graph, person_label, "email");
-  auto language_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "language");
+  auto language_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "language");
   auto place_name_col =
       ldbc::get_vertex_column<std::string_view>(graph, place_label, "name");
   auto org_name_col =
@@ -296,8 +298,8 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
       person_label, place_label, is_located_in_label);
   const auto person_study_at_out = graph.GetGenericOutgoingGraphView(
       person_label, org_label, study_at_label);
-  const auto person_work_at_out = graph.GetGenericOutgoingGraphView(
-      person_label, org_label, work_at_label);
+  const auto person_work_at_out =
+      graph.GetGenericOutgoingGraphView(person_label, org_label, work_at_label);
   const auto org_located_in_out = graph.GetGenericOutgoingGraphView(
       org_label, place_label, is_located_in_label);
 
@@ -312,8 +314,8 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
         person_label, org_label, study_at_label, "classYear");
   }
   if (has_work_from) {
-    work_from_accessor = graph.GetEdgeDataAccessor(
-        person_label, org_label, work_at_label, "workFrom");
+    work_from_accessor = graph.GetEdgeDataAccessor(person_label, org_label,
+                                                   work_at_label, "workFrom");
   }
 
   execution::ValueColumnBuilder<int64_t> friend_id_builder;
@@ -421,12 +423,13 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
       tuple_vals.emplace_back(execution::Value::STRING(
           std::string(org_name_col->get_view(org_vid))));
       tuple_vals.emplace_back(execution::Value::INT32(work_from));
-      tuple_vals.emplace_back(execution::Value::STRING(std::move(country_name)));
+      tuple_vals.emplace_back(
+          execution::Value::STRING(std::move(country_name)));
       company_values.emplace_back(
           execution::Value::STRUCT(kOrgPlaceTupleType, std::move(tuple_vals)));
     }
-    companies_builder.push_back_elem(execution::Value::LIST(
-        kOrgPlaceTupleType, std::move(company_values)));
+    companies_builder.push_back_elem(
+        execution::Value::LIST(kOrgPlaceTupleType, std::move(company_values)));
   }
 
   return ldbc::make_output_context(
@@ -451,14 +454,17 @@ function::function_set IC1Function::getFunctionSet() {
                                       common::DataTypeId::kVarchar},
       function::call_output_columns{
           function::call_output("friendId", common::DataTypeId::kInt64),
-          function::call_output("distanceFromPerson", common::DataTypeId::kInt32),
+          function::call_output("distanceFromPerson",
+                                common::DataTypeId::kInt32),
           function::call_output("friendLastName", common::DataTypeId::kVarchar),
           function::call_output("friendBirthday", common::DataTypeId::kDate),
           function::call_output("friendCreationDate",
                                 common::DataTypeId::kTimestampMs),
           function::call_output("friendGender", common::DataTypeId::kVarchar),
-          function::call_output("friendBrowserUsed", common::DataTypeId::kVarchar),
-          function::call_output("friendLocationIp", common::DataTypeId::kVarchar),
+          function::call_output("friendBrowserUsed",
+                                common::DataTypeId::kVarchar),
+          function::call_output("friendLocationIp",
+                                common::DataTypeId::kVarchar),
           function::call_output("friendCityName", common::DataTypeId::kVarchar),
           function::call_output("friendEmail", common::DataTypeId::kVarchar),
           function::call_output("friendLanguage", common::DataTypeId::kVarchar),

@@ -46,8 +46,9 @@ struct TagRowCmp {
   }
 };
 
-void try_push_tag(std::priority_queue<TagRow, std::vector<TagRow>, TagRowCmp>* heap,
-                    int count, std::string_view name) {
+void try_push_tag(
+    std::priority_queue<TagRow, std::vector<TagRow>, TagRowCmp>* heap,
+    int count, std::string_view name) {
   if (count == 0) {
     return;
   }
@@ -65,7 +66,8 @@ void try_push_tag(std::priority_queue<TagRow, std::vector<TagRow>, TagRowCmp>* h
 std::unique_ptr<function::CallFuncInputBase> bind_ic4(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   if (params.size() < 3) {
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic4 requires 3 arguments: personId, startDate, durationDays");
@@ -76,7 +78,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic4(
 }
 
 execution::Context exec_ic4(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC4FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const int64_t start_date_ms = params.at("startDate").GetValue<int64_t>();
@@ -107,8 +110,8 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
 
   const auto post_in = graph.GetGenericIncomingGraphView(
       person_label, post_label, has_creator_label);
-  const auto post_tag_out = graph.GetGenericOutgoingGraphView(
-      post_label, tag_label, has_tag_label);
+  const auto post_tag_out =
+      graph.GetGenericOutgoingGraphView(post_label, tag_label, has_tag_label);
 
   auto post_date_col =
       ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
@@ -125,7 +128,8 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
         const auto posts = post_in.get_edges(friend_vid);
         for (auto pit = posts.begin(); pit != posts.end(); ++pit) {
           const vid_t post_vid = *pit;
-          const int64_t created = post_date_col->get_view(post_vid).milli_second;
+          const int64_t created =
+              post_date_col->get_view(post_vid).milli_second;
           if (created >= end_ms) {
             continue;
           }
@@ -175,8 +179,7 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
   }
 
   return ldbc::make_output_context(
-      args.output_aliases,
-      {name_builder.finish(), count_builder.finish()});
+      args.output_aliases, {name_builder.finish(), count_builder.finish()});
 }
 
 }  // namespace
@@ -187,9 +190,8 @@ function::function_set IC4Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      function::call_output_columns{
-          {"tagName", common::DataTypeId::kVarchar},
-          {"postCount", common::DataTypeId::kInt32}});
+      function::call_output_columns{{"tagName", common::DataTypeId::kVarchar},
+                                    {"postCount", common::DataTypeId::kInt32}});
   fn->bindFunc = bind_ic4;
   fn->execFunc = exec_ic4;
   function::function_set set;

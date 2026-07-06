@@ -23,12 +23,12 @@
 #include <string_view>
 #include <vector>
 
+#include "ldbc_common.h"
 #include "neug/compiler/common/types/types.h"
 #include "neug/execution/common/columns/value_columns.h"
 #include "neug/execution/common/context.h"
 #include "neug/execution/common/context_chunk.h"
 #include "neug/execution/common/types/value.h"
-#include "ldbc_common.h"
 #include "neug/storages/csr/csr_view.h"
 #include "neug/utils/exception/exception.h"
 
@@ -61,9 +61,6 @@ struct PersonResultComparer {
   }
 };
 
-
-
-
 template <typename T>
 std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(
     const StorageReadInterface& graph, label_t label,
@@ -74,14 +71,12 @@ std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(
 }
 
 vid_t get_single_out_neighbor(const CsrView& view, vid_t vertex) {
-  for (auto it = view.get_edges(vertex).begin(); it != view.get_edges(vertex).end();
-       ++it) {
+  for (auto it = view.get_edges(vertex).begin();
+       it != view.get_edges(vertex).end(); ++it) {
     return *it;
   }
   return StorageReadInterface::kInvalidVid;
 }
-
-
 
 std::unique_ptr<function::CallFuncInputBase> bind_ic3(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
@@ -100,11 +95,14 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic3(
 }
 
 execution::Context exec_ic3(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& ic3_input = dynamic_cast<const IC3FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const std::string country_x_name = params.at("countryXName").GetValue<std::string>();
-  const std::string country_y_name = params.at("countryYName").GetValue<std::string>();
+  const std::string country_x_name =
+      params.at("countryXName").GetValue<std::string>();
+  const std::string country_y_name =
+      params.at("countryYName").GetValue<std::string>();
   const int64_t start_date_ms = params.at("startDate").GetValue<int64_t>();
   const int64_t duration_days = params.at("durationDays").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -136,8 +134,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -167,10 +164,12 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
       place_label, place_label, is_part_of_label);
   const auto& city_in_country_x = city_in_country.get_edges(country_x);
   const auto& city_in_country_y = city_in_country.get_edges(country_y);
-  for (auto it = city_in_country_x.begin(); it != city_in_country_x.end(); ++it) {
+  for (auto it = city_in_country_x.begin(); it != city_in_country_x.end();
+       ++it) {
     city_in_country_x_or_y[*it] = 1;
   }
-  for (auto it = city_in_country_y.begin(); it != city_in_country_y.end(); ++it) {
+  for (auto it = city_in_country_y.begin(); it != city_in_country_y.end();
+       ++it) {
     city_in_country_x_or_y[*it] = 1;
   }
 
@@ -181,11 +180,8 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
   const auto comment_located_in = graph.GetGenericOutgoingGraphView(
       comment_label, place_label, is_located_in_label);
 
-
-  
-
   std::vector<vid_t> friends;
-    ldbc::foreach_knows_1d_2d_neighbor(
+  ldbc::foreach_knows_1d_2d_neighbor(
       graph, person_label, knows_label, root, [&](vid_t friend_vid) {
         const vid_t city_vid =
             get_single_out_neighbor(person_located_in, friend_vid);
@@ -193,12 +189,8 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
           return;
         }
         friends.push_back(friend_vid);
-     });
-     const int64_t end_date_ms =
-      start_date_ms + duration_days * kMillisPerDay;
-
-
-
+      });
+  const int64_t end_date_ms = start_date_ms + duration_days * kMillisPerDay;
 
   const auto post_has_creator_in = ldbc::get_typed_incoming_view(
       graph, person_label, post_label, has_creator_label);
@@ -209,60 +201,60 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
                       PersonResultComparer>
       pq;
 
+  for (vid_t friend_vid : friends) {
+    int x_count = 0;
+    int y_count = 0;
 
-    for (vid_t friend_vid : friends) {
-      int x_count = 0;
-      int y_count = 0;
+    auto scan_friend_messages =
+        [&](const CsrView& located_in_view,
+            const ldbc::DateTimeIncomingView& has_creator_in) {
+          ldbc::foreach_incoming_nbr_between_half_open(
+              has_creator_in, friend_vid, start_date_ms, end_date_ms,
+              [&](vid_t message_vid, const DateTime& /*creation_date*/) {
+                const vid_t locate =
+                    get_single_out_neighbor(located_in_view, message_vid);
+                if (locate == country_x) {
+                  ++x_count;
+                } else if (locate == country_y) {
+                  ++y_count;
+                }
+              });
+        };
 
-      auto scan_friend_messages = [&](const CsrView& located_in_view,
-                                      const ldbc::DateTimeIncomingView&
-                                          has_creator_in) {
-        ldbc::foreach_incoming_nbr_between_half_open(
-            has_creator_in, friend_vid, start_date_ms, end_date_ms,
-            [&](vid_t message_vid, const DateTime& /*creation_date*/) {
-              const vid_t locate =
-                  get_single_out_neighbor(located_in_view, message_vid);
-              if (locate == country_x) {
-                ++x_count;
-              } else if (locate == country_y) {
-                ++y_count;
-              }
-            });
-      };
+    scan_friend_messages(post_located_in, post_has_creator_in);
+    scan_friend_messages(comment_located_in, comment_has_creator_in);
 
-      scan_friend_messages(post_located_in, post_has_creator_in);
-      scan_friend_messages(comment_located_in, comment_has_creator_in);
+    if (x_count == 0 || y_count == 0) {
+      continue;
+    }
+    PersonResult row;
+    row.person_vid = friend_vid;
+    row.count_x = x_count;
+    row.count_y = y_count;
+    row.total = x_count + y_count;
+    if (pq.size() < kTopN) {
+      row.person_id =
+          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
 
-      if (x_count == 0 || y_count == 0) {
-        continue;
+      pq.push(row);
+      continue;
+    }
+    const auto& worst = pq.top();
+    if (row.total > worst.total) {
+      pq.pop();
+      row.person_id =
+          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+      pq.push(row);
+      continue;
+    }
+    if (row.total == worst.total) {
+      row.person_id =
+          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+      if (row.person_id < worst.person_id) {
+        pq.pop();
+        pq.push(row);
       }
-      PersonResult row;
-      row.person_vid = friend_vid;
-      row.count_x = x_count;
-      row.count_y = y_count;
-      row.total = x_count + y_count;
-       if (pq.size() < kTopN) {
-   row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
-      
-    pq.push(row);
-    continue;
-  }
-  const auto& worst = pq.top();
-  if (row.total > worst.total) {
-    pq.pop();
-    row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
-    pq.push(row);
-    continue;
-  }
-  row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
-  if (row.total == worst.total &&
-      row.person_id < worst.person_id) {
-    pq.pop();
-    pq.push(row);
-  }
+    }
   }
 
   std::vector<PersonResult> results;

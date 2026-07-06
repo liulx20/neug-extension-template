@@ -17,6 +17,11 @@
 #include <string>
 
 #include "ic1.h"
+#include "ic10.h"
+#include "ic11.h"
+#include "ic12.h"
+#include "ic13.h"
+#include "ic14.h"
 #include "ic2.h"
 #include "ic3.h"
 #include "ic4.h"
@@ -25,11 +30,6 @@
 #include "ic7.h"
 #include "ic8.h"
 #include "ic9.h"
-#include "ic10.h"
-#include "ic11.h"
-#include "ic12.h"
-#include "ic13.h"
-#include "ic14.h"
 #include "is1.h"
 #include "is2.h"
 #include "is3.h"
@@ -43,12 +43,12 @@
 
 namespace {
 
-#define REGISTER_SCALAR_FUNC(Func)                                           \
-  neug::extension::ExtensionAPI::registerFunction<Func>(                   \
+#define REGISTER_SCALAR_FUNC(Func)                       \
+  neug::extension::ExtensionAPI::registerFunction<Func>( \
       neug::catalog::CatalogEntryType::SCALAR_FUNCTION_ENTRY)
 
-#define REGISTER_TABLE_FUNC(Func)                                            \
-  neug::extension::ExtensionAPI::registerFunction<Func>(                   \
+#define REGISTER_TABLE_FUNC(Func)                        \
+  neug::extension::ExtensionAPI::registerFunction<Func>( \
       neug::catalog::CatalogEntryType::TABLE_FUNCTION_ENTRY)
 
 void register_ldbc_functions() {
@@ -85,9 +85,9 @@ void Init() {
     register_ldbc_functions();
 
     neug::extension::ExtensionAPI::registerExtension(
-        neug::extension::ExtensionInfo{
-            "wiggle",
-            "LDBC SNB Interactive read queries (ic1-ic14, is1-is7) and wiggle()."});
+        neug::extension::ExtensionInfo{"wiggle",
+                                       "LDBC SNB Interactive read queries "
+                                       "(ic1-ic14, is1-is7) and wiggle()."});
 
     LOG(INFO) << "[wiggle extension] initialized";
   } catch (const std::exception& e) {

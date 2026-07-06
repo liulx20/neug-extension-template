@@ -52,7 +52,6 @@ struct MessageInfoComparer {
   }
 };
 
-
 void scan_messages(
     const StorageReadInterface& graph,
     const ldbc::DateTimeIncomingView& has_creator_in, label_t message_label,
@@ -60,46 +59,45 @@ void scan_messages(
     const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                         MessageInfoComparer>& pq) {
-
-    ldbc::foreach_incoming_nbr_between(
-        has_creator_in, friend_vid, 0, max_date_ms,
-        [&](vid_t message_vid, const DateTime& creation_date) {
-          MessageInfo info;
-          info.message_vid = message_vid;
-          info.person_vid = friend_vid;
-          info.creation_date_ms = creation_date.milli_second;
-          info.is_post = is_post;
-          if (pq.size() < kTopN) {
-            info.message_id =
-                graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
-            pq.push(info);
-            return;
-          }
-          const auto& worst = pq.top();
-          if (info.creation_date_ms > worst.creation_date_ms) {
-            pq.pop();
-            info.message_id =
-                graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
-            pq.push(info);
-            return;
-          }
+  ldbc::foreach_incoming_nbr_between(
+      has_creator_in, friend_vid, 0, max_date_ms,
+      [&](vid_t message_vid, const DateTime& creation_date) {
+        MessageInfo info;
+        info.message_vid = message_vid;
+        info.person_vid = friend_vid;
+        info.creation_date_ms = creation_date.milli_second;
+        info.is_post = is_post;
+        if (pq.size() < kTopN) {
           info.message_id =
-                graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
-          if (info.creation_date_ms == worst.creation_date_ms &&
-              info.message_id < worst.message_id) {
+              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          pq.push(info);
+          return;
+        }
+        const auto& worst = pq.top();
+        if (info.creation_date_ms > worst.creation_date_ms) {
+          pq.pop();
+          info.message_id =
+              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          pq.push(info);
+          return;
+        }
+
+        if (info.creation_date_ms == worst.creation_date_ms) {
+          info.message_id =
+              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          if (info.message_id < worst.message_id) {
             pq.pop();
             pq.push(info);
           }
-        });
-  
-
-
+        }
+      });
 }
 
 std::unique_ptr<function::CallFuncInputBase> bind_ic9(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   if (params.size() < 2) {
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic9 requires 2 arguments: personId and maxDate");
@@ -110,7 +108,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic9(
 }
 
 execution::Context exec_ic9(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC9FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const int64_t max_date_ms = params.at("maxDate").GetValue<int64_t>();
@@ -123,10 +122,10 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
   const label_t knows_label = schema.get_edge_label_id("KNOWS");
   const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   auto post_date_col =
       ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
   auto comment_date_col =
@@ -141,14 +140,13 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
     return execution::Context{};
   }
 
-
-
   const auto post_has_creator_in = ldbc::get_typed_incoming_view(
       graph, person_label, post_label, has_creator_label);
   const auto comment_has_creator_in = ldbc::get_typed_incoming_view(
       graph, person_label, comment_label, has_creator_label);
 
-  std::priority_queue<MessageInfo, std::vector<MessageInfo>, MessageInfoComparer>
+  std::priority_queue<MessageInfo, std::vector<MessageInfo>,
+                      MessageInfoComparer>
       pq;
   ldbc::foreach_knows_1d_2d_neighbor(
       graph, person_label, knows_label, root, [&](vid_t friend_vid) {

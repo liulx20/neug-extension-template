@@ -55,10 +55,10 @@ bool matches_zodiac_month(const Date& birthday, int month) {
          (birthday.month() == next_month && birthday.day() < 22);
 }
 
-int score_friend_posts(
-    const StorageReadInterface& graph, vid_t friend_vid,
-    const CsrView& post_has_creator_in, const CsrView& post_has_tag_out,
-    const std::vector<bool>& has_interests) {
+int score_friend_posts(const StorageReadInterface& graph, vid_t friend_vid,
+                       const CsrView& post_has_creator_in,
+                       const CsrView& post_has_tag_out,
+                       const std::vector<bool>& has_interests) {
   int score = 0;
   const auto posts = post_has_creator_in.get_edges(friend_vid);
   for (auto pit = posts.begin(); pit != posts.end(); ++pit) {
@@ -79,7 +79,8 @@ int score_friend_posts(
 std::unique_ptr<function::CallFuncInputBase> bind_ic10(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   if (params.size() < 2) {
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic10 requires 2 arguments: personId and month");
@@ -90,7 +91,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic10(
 }
 
 execution::Context exec_ic10(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                             IStorageInterface& graph_iface,
+                             const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC10FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const int32_t month = params.at("month").GetValue<int32_t>();
@@ -107,10 +109,10 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
   const label_t has_tag_label = schema.get_edge_label_id("HASTAG");
   const label_t is_located_in_label = schema.get_edge_label_id("ISLOCATEDIN");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   auto gender_col =
       ldbc::get_vertex_column<std::string_view>(graph, person_label, "gender");
   auto birthday_col =
@@ -146,8 +148,8 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
 
   const auto post_has_creator_in = graph.GetGenericIncomingGraphView(
       person_label, post_label, has_creator_label);
-  const auto post_has_tag_out = graph.GetGenericOutgoingGraphView(
-      post_label, tag_label, has_tag_label);
+  const auto post_has_tag_out =
+      graph.GetGenericOutgoingGraphView(post_label, tag_label, has_tag_label);
   const auto person_located_in_out = graph.GetGenericOutgoingGraphView(
       person_label, place_label, is_located_in_label);
 
@@ -160,8 +162,8 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
     const vid_t v = friends[friends_index++];
     const int score = score_friend_posts(graph, v, post_has_creator_in,
                                          post_has_tag_out, has_interests);
-    pq.push(PersonResult{score, v,
-                         graph.GetVertexId(person_label, v).GetValue<int64_t>()});
+    pq.push(PersonResult{
+        score, v, graph.GetVertexId(person_label, v).GetValue<int64_t>()});
   }
 
   int min_score = pq.empty() ? 0 : pq.top().score;
@@ -189,13 +191,13 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
       --remaining;
     }
     if (pq.size() < kTopN) {
-      pq.push(PersonResult{score, v,
-                           graph.GetVertexId(person_label, v).GetValue<int64_t>()});
+      pq.push(PersonResult{
+          score, v, graph.GetVertexId(person_label, v).GetValue<int64_t>()});
       min_score = pq.top().score;
     } else if (score > min_score) {
       pq.pop();
-      pq.push(PersonResult{score, v,
-                           graph.GetVertexId(person_label, v).GetValue<int64_t>()});
+      pq.push(PersonResult{
+          score, v, graph.GetVertexId(person_label, v).GetValue<int64_t>()});
       min_score = pq.top().score;
     } else if (score == min_score) {
       const int64_t person_id =

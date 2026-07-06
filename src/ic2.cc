@@ -58,7 +58,6 @@ struct MessageInfoComparer {
   }
 };
 
-
 template <typename T>
 std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(
     const StorageReadInterface& graph, label_t label,
@@ -86,41 +85,49 @@ void foreach_knows_neighbor(const StorageReadInterface& graph,
   }
 }
 
-
-
 void scan_messages_for_friend(
     const StorageReadInterface& graph,
     const ldbc::DateTimeIncomingView& has_creator_in, label_t message_label,
-    bool is_post, vid_t friend_vid, int64_t max_date_ms,
+    bool is_post, vid_t friend_vid, int64_t& min_date_ms, int64_t max_date_ms,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                         MessageInfoComparer>& pq) {
-  ldbc::foreach_incoming_nbr_between(
-      has_creator_in, friend_vid, 0, max_date_ms,
+  ldbc::foreach_incoming_nbr_lt(
+      has_creator_in, friend_vid, DateTime(max_date_ms + 1),
       [&](vid_t message_vid, const DateTime& creation_date) {
-        MessageInfo info;
-        info.message_vid = message_vid;
-        info.person_vid = friend_vid;
-        info.creation_date_ms = creation_date.milli_second;
-        info.is_post = is_post;
-         if (pq.size() < kTopN) {
-          info.message_id = graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
-    pq.push(info);
-    return;
-  }
+        const int64_t creation_date_ms = creation_date.milli_second;
+        if (creation_date_ms < min_date_ms) {
+          return;
+        }
+        if (pq.size() < kTopN) {
+          const int64_t message_id =
+              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          pq.push(MessageInfo{message_vid, friend_vid, message_id,
+                              creation_date_ms, is_post});
+          if (pq.size() == kTopN) {
+            min_date_ms = pq.top().creation_date_ms;
+          }
+          return;
+        }
 
-  const auto& worst = pq.top();
-  if (info.creation_date_ms > worst.creation_date_ms) {
-    pq.pop();
-    info.message_id = graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
-    pq.push(info);
-    return;
-  }
-  info.message_id = graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
-  if (info.creation_date_ms == worst.creation_date_ms &&
-    info.message_id < worst.message_id) {
-    pq.pop();
-    pq.push(info);
-  }
+        if (creation_date_ms > min_date_ms) {
+          const int64_t message_id =
+              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          pq.pop();
+          pq.push(MessageInfo{message_vid, friend_vid, message_id,
+                              creation_date_ms, is_post});
+          min_date_ms = pq.top().creation_date_ms;
+          return;
+        }
+
+        if (creation_date_ms == min_date_ms) {
+          const int64_t message_id =
+              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          if (message_id < pq.top().message_id) {
+            pq.pop();
+            pq.push(MessageInfo{message_vid, friend_vid, message_id,
+                                creation_date_ms, is_post});
+          }
+        }
       });
 }
 
@@ -140,7 +147,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic2(
 }
 
 execution::Context exec_ic2(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& ic2_input = dynamic_cast<const IC2FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const int64_t max_date_ms = params.at("maxDate").GetValue<int64_t>();
@@ -167,8 +175,7 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
       get_vertex_column<std::string_view>(graph, comment_label, "content");
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -178,17 +185,18 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
   const auto comment_has_creator_in = ldbc::get_typed_incoming_view(
       graph, person_label, comment_label, has_creator_label);
 
-  std::priority_queue<MessageInfo, std::vector<MessageInfo>, MessageInfoComparer>
+  std::priority_queue<MessageInfo, std::vector<MessageInfo>,
+                      MessageInfoComparer>
       pq;
-  foreach_knows_neighbor(graph, person_label, knows_label, root,
-                         [&](vid_t friend_vid) {
-                           scan_messages_for_friend(
-                               graph, post_has_creator_in, post_label, true,
-                               friend_vid, max_date_ms, pq);
-                           scan_messages_for_friend(
-                               graph, comment_has_creator_in, comment_label,
-                               false, friend_vid, max_date_ms, pq);
-                         });
+  int64_t min_date_ms = 0;
+  foreach_knows_neighbor(
+      graph, person_label, knows_label, root, [&](vid_t friend_vid) {
+        scan_messages_for_friend(graph, post_has_creator_in, post_label, true,
+                                 friend_vid, min_date_ms, max_date_ms, pq);
+        scan_messages_for_friend(graph, comment_has_creator_in, comment_label,
+                                 false, friend_vid, min_date_ms, max_date_ms,
+                                 pq);
+      });
 
   std::vector<MessageInfo> results;
   results.reserve(pq.size());
@@ -222,10 +230,9 @@ execution::Context exec_ic2(const function::CallFuncInputBase& input,
     message_id_builder.push_back_opt(row.message_id);
 
     if (row.is_post) {
-      const auto& content =
-          post_length_col->get_view(row.message_vid) == 0
-              ? post_image_col->get_view(row.message_vid)
-              : post_content_col->get_view(row.message_vid);
+      const auto& content = post_length_col->get_view(row.message_vid) == 0
+                                ? post_image_col->get_view(row.message_vid)
+                                : post_content_col->get_view(row.message_vid);
       message_content_builder.push_back_opt(std::string(content));
     } else {
       message_content_builder.push_back_opt(

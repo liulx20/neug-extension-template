@@ -58,7 +58,8 @@ struct WorkResultComparer {
 std::unique_ptr<function::CallFuncInputBase> bind_ic11(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   if (params.size() < 3) {
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic11 requires 3 arguments: personId, countryName, workFromYear");
@@ -69,10 +70,12 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic11(
 }
 
 execution::Context exec_ic11(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                             IStorageInterface& graph_iface,
+                             const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC11FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const std::string country_name = params.at("countryName").GetValue<std::string>();
+  const std::string country_name =
+      params.at("countryName").GetValue<std::string>();
   const int32_t work_from_year = params.at("workFromYear").GetValue<int32_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
@@ -84,10 +87,10 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
   const label_t work_at_label = schema.get_edge_label_id("WORKAT");
   const label_t is_located_in_label = schema.get_edge_label_id("ISLOCATEDIN");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   auto org_name_col =
       ldbc::get_vertex_column<std::string_view>(graph, org_label, "name");
   if (!first_name_col || !last_name_col || !org_name_col) {
@@ -112,14 +115,14 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
 
   const auto org_located_in_in = graph.GetGenericIncomingGraphView(
       place_label, org_label, is_located_in_label);
-  const auto person_work_at_in = graph.GetGenericIncomingGraphView(
-      org_label, person_label, work_at_label);
+  const auto person_work_at_in =
+      graph.GetGenericIncomingGraphView(org_label, person_label, work_at_label);
   const bool has_work_from = schema.edge_has_property(
       person_label, org_label, work_at_label, "workFrom");
   EdgeDataAccessor work_from_accessor;
   if (has_work_from) {
-    work_from_accessor = graph.GetEdgeDataAccessor(
-        person_label, org_label, work_at_label, "workFrom");
+    work_from_accessor = graph.GetEdgeDataAccessor(person_label, org_label,
+                                                   work_at_label, "workFrom");
   }
 
   std::priority_queue<WorkResult, std::vector<WorkResult>, WorkResultComparer>

@@ -32,14 +32,16 @@ constexpr size_t kNumOutputColumns = 5;
 std::unique_ptr<function::CallFuncInputBase> bind_is6(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IS6FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is6(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& is6_input = dynamic_cast<const IS6FuncInput&>(input);
   const int64_t message_id = params.at("messageId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -53,10 +55,10 @@ execution::Context exec_is6(const function::CallFuncInputBase& input,
   const label_t container_of_label = schema.get_edge_label_id("CONTAINEROF");
   const label_t has_moderator_label = schema.get_edge_label_id("HASMODERATOR");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   auto forum_title_col =
       ldbc::get_vertex_column<std::string_view>(graph, forum_label, "title");
   if (!first_name_col || !last_name_col || !forum_title_col) {
@@ -65,9 +67,8 @@ execution::Context exec_is6(const function::CallFuncInputBase& input,
 
   vid_t message_vid = StorageReadInterface::kInvalidVid;
   bool is_post = false;
-  if (!ldbc::find_message_vertex(graph, post_label, comment_label,
-                                 message_id, &message_vid,
-                                 &is_post)) {
+  if (!ldbc::find_message_vertex(graph, post_label, comment_label, message_id,
+                                 &message_vid, &is_post)) {
     return execution::Context{};
   }
 
@@ -118,17 +119,18 @@ execution::Context exec_is6(const function::CallFuncInputBase& input,
   output_columns[3] = moderator_first_builder.finish();
   output_columns[4] = moderator_last_builder.finish();
 
-  return ldbc::make_output_context(is6_input.output_aliases,
-                                   {output_columns[0], output_columns[1],
-                                    output_columns[2], output_columns[3],
-                                    output_columns[4]});
+  return ldbc::make_output_context(
+      is6_input.output_aliases,
+      {output_columns[0], output_columns[1], output_columns[2],
+       output_columns[3], output_columns[4]});
 }
 
 }  // namespace
 
 function::function_set IS6Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
-      IS6Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      IS6Function::name,
+      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
           {"forumId", common::DataTypeId::kInt64},
           {"forumTitle", common::DataTypeId::kVarchar},

@@ -54,7 +54,8 @@ struct CommentResultComparer {
 std::unique_ptr<function::CallFuncInputBase> bind_ic8(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IC8FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
@@ -120,7 +121,8 @@ void scan_replies(
 }
 
 execution::Context exec_ic8(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& ic8_input = dynamic_cast<const IC8FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -132,12 +134,12 @@ execution::Context exec_ic8(const function::CallFuncInputBase& input,
   const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
   const label_t reply_of_label = schema.get_edge_label_id("REPLYOF");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
-  auto comment_content_col =
-      ldbc::get_vertex_column<std::string_view>(graph, comment_label, "content");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
+  auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
+      graph, comment_label, "content");
   auto comment_date_col =
       ldbc::get_vertex_column<DateTime>(graph, comment_label, "creationDate");
   if (!first_name_col || !last_name_col || !comment_content_col) {
@@ -145,8 +147,7 @@ execution::Context exec_ic8(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -224,17 +225,18 @@ execution::Context exec_ic8(const function::CallFuncInputBase& input,
   output_columns[4] = comment_id_builder.finish();
   output_columns[5] = comment_content_builder.finish();
 
-  return ldbc::make_output_context(ic8_input.output_aliases,
-                                   {output_columns[0], output_columns[1],
-                                    output_columns[2], output_columns[3],
-                                    output_columns[4], output_columns[5]});
+  return ldbc::make_output_context(
+      ic8_input.output_aliases,
+      {output_columns[0], output_columns[1], output_columns[2],
+       output_columns[3], output_columns[4], output_columns[5]});
 }
 
 }  // namespace
 
 function::function_set IC8Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
-      IC8Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      IC8Function::name,
+      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"personFirstName", common::DataTypeId::kVarchar},

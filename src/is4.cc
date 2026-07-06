@@ -32,14 +32,16 @@ constexpr size_t kNumOutputColumns = 2;
 std::unique_ptr<function::CallFuncInputBase> bind_is4(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IS4FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is4(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& is4_input = dynamic_cast<const IS4FuncInput&>(input);
   const int64_t message_id = params.at("messageId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -50,9 +52,8 @@ execution::Context exec_is4(const function::CallFuncInputBase& input,
 
   vid_t message_vid = StorageReadInterface::kInvalidVid;
   bool is_post = false;
-  if (!ldbc::find_message_vertex(graph, post_label, comment_label,
-                                 message_id, &message_vid,
-                                 &is_post)) {
+  if (!ldbc::find_message_vertex(graph, post_label, comment_label, message_id,
+                                 &message_vid, &is_post)) {
     return execution::Context{};
   }
 
@@ -60,9 +61,8 @@ execution::Context exec_is4(const function::CallFuncInputBase& input,
   auto creation_date_col =
       ldbc::get_vertex_column<DateTime>(graph, message_label, "creationDate");
   const int64_t creation_ms =
-      creation_date_col
-          ? creation_date_col->get_view(message_vid).milli_second
-          : 0;
+      creation_date_col ? creation_date_col->get_view(message_vid).milli_second
+                        : 0;
   const std::string content = ldbc::message_content(
       graph, post_label, comment_label, message_vid, is_post);
 
@@ -84,7 +84,8 @@ execution::Context exec_is4(const function::CallFuncInputBase& input,
 
 function::function_set IS4Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
-      IS4Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      IS4Function::name,
+      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
           {"messageContent", common::DataTypeId::kVarchar},
           {"messageCreationDate", common::DataTypeId::kTimestampMs}});

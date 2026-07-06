@@ -42,14 +42,16 @@ struct ReplyInfo {
 std::unique_ptr<function::CallFuncInputBase> bind_is7(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IS7FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is7(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& is7_input = dynamic_cast<const IS7FuncInput&>(input);
   const int64_t message_id = params.at("messageId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -62,21 +64,20 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
   const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
   const label_t knows_label = schema.get_edge_label_id("KNOWS");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
-  auto comment_content_col =
-      ldbc::get_vertex_column<std::string_view>(graph, comment_label, "content");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
+  auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
+      graph, comment_label, "content");
   if (!first_name_col || !last_name_col || !comment_content_col) {
     THROW_RUNTIME_ERROR("is7: failed to load required LDBC property columns");
   }
 
   vid_t message_vid = StorageReadInterface::kInvalidVid;
   bool is_post = false;
-  if (!ldbc::find_message_vertex(graph, post_label, comment_label,
-                                 message_id, &message_vid,
-                                 &is_post)) {
+  if (!ldbc::find_message_vertex(graph, post_label, comment_label, message_id,
+                                 &message_vid, &is_post)) {
     return execution::Context{};
   }
 
@@ -86,8 +87,8 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
       comment_label, person_label, has_creator_label, "creationDate");
   EdgeDataAccessor edge_accessor;
   if (has_edge_date) {
-    edge_accessor = graph.GetEdgeDataAccessor(comment_label, person_label,
-                                              has_creator_label, "creationDate");
+    edge_accessor = graph.GetEdgeDataAccessor(
+        comment_label, person_label, has_creator_label, "creationDate");
   }
 
   const label_t message_label = is_post ? post_label : comment_label;
@@ -154,7 +155,8 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
       person_label, person_label, knows_label);
   const auto knows_in = graph.GetGenericIncomingGraphView(
       person_label, person_label, knows_label);
-  std::vector<bool> knows_author(graph.GetVertexSet(person_label).size(), false);
+  std::vector<bool> knows_author(graph.GetVertexSet(person_label).size(),
+                                 false);
   auto mark_knows = [&](const CsrView& view) {
     for (auto it = view.get_edges(message_author_vid).begin();
          it != view.get_edges(message_author_vid).end(); ++it) {
@@ -195,18 +197,19 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
   output_columns[5] = reply_author_last_builder.finish();
   output_columns[6] = knows_builder.finish();
 
-  return ldbc::make_output_context(is7_input.output_aliases,
-                                   {output_columns[0], output_columns[1],
-                                    output_columns[2], output_columns[3],
-                                    output_columns[4], output_columns[5],
-                                    output_columns[6]});
+  return ldbc::make_output_context(
+      is7_input.output_aliases,
+      {output_columns[0], output_columns[1], output_columns[2],
+       output_columns[3], output_columns[4], output_columns[5],
+       output_columns[6]});
 }
 
 }  // namespace
 
 function::function_set IS7Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
-      IS7Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      IS7Function::name,
+      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
           {"commentId", common::DataTypeId::kInt64},
           {"commentContent", common::DataTypeId::kVarchar},

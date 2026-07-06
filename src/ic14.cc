@@ -41,10 +41,8 @@ namespace ldbc_ic {
 namespace {
 
 uint64_t pair_key(vid_t a, vid_t b) {
-  return a > b ? (static_cast<uint64_t>(a) |
-                  (static_cast<uint64_t>(b) << 32))
-             : (static_cast<uint64_t>(b) |
-                (static_cast<uint64_t>(a) << 32));
+  return a > b ? (static_cast<uint64_t>(a) | (static_cast<uint64_t>(b) << 32))
+               : (static_cast<uint64_t>(b) | (static_cast<uint64_t>(a) << 32));
 }
 
 class IC14Scorer {
@@ -87,8 +85,8 @@ class IC14Scorer {
           score += 2;
         }
       } else {
-        const vid_t parent =
-            ldbc::get_single_out_neighbor(comment_reply_comment_out_, comment_vid);
+        const vid_t parent = ldbc::get_single_out_neighbor(
+            comment_reply_comment_out_, comment_vid);
         if (parent != StorageReadInterface::kInvalidVid) {
           const vid_t author =
               ldbc::get_single_out_neighbor(comment_creator_out_, parent);
@@ -110,8 +108,8 @@ class IC14Scorer {
           score += 2;
         }
       } else {
-        const vid_t parent =
-            ldbc::get_single_out_neighbor(comment_reply_comment_out_, comment_vid);
+        const vid_t parent = ldbc::get_single_out_neighbor(
+            comment_reply_comment_out_, comment_vid);
         if (parent != StorageReadInterface::kInvalidVid) {
           const vid_t author =
               ldbc::get_single_out_neighbor(comment_creator_out_, parent);
@@ -125,12 +123,10 @@ class IC14Scorer {
   }
 
   int pair_score_one(vid_t root, vid_t other) const {
-    const size_t root_degree =
-        ldbc::count_edges(comment_creator_in_, root) +
-        ldbc::count_edges(post_creator_in_, root);
-    const size_t other_degree =
-        ldbc::count_edges(comment_creator_in_, other) +
-        ldbc::count_edges(post_creator_in_, other);
+    const size_t root_degree = ldbc::count_edges(comment_creator_in_, root) +
+                               ldbc::count_edges(post_creator_in_, root);
+    const size_t other_degree = ldbc::count_edges(comment_creator_in_, other) +
+                                ldbc::count_edges(post_creator_in_, other);
     const vid_t u = root_degree > other_degree ? other : root;
     const vid_t v = root_degree > other_degree ? root : other;
 
@@ -147,8 +143,8 @@ class IC14Scorer {
           score += 2;
         }
       } else {
-        const vid_t parent =
-            ldbc::get_single_out_neighbor(comment_reply_comment_out_, comment_vid);
+        const vid_t parent = ldbc::get_single_out_neighbor(
+            comment_reply_comment_out_, comment_vid);
         if (parent != StorageReadInterface::kInvalidVid) {
           const vid_t author =
               ldbc::get_single_out_neighbor(comment_creator_out_, parent);
@@ -193,8 +189,8 @@ class IC14Scorer {
           (*counts)[author] += 2;
         }
       } else {
-        const vid_t parent =
-            ldbc::get_single_out_neighbor(comment_reply_comment_out_, comment_vid);
+        const vid_t parent = ldbc::get_single_out_neighbor(
+            comment_reply_comment_out_, comment_vid);
         if (parent != StorageReadInterface::kInvalidVid) {
           const vid_t author =
               ldbc::get_single_out_neighbor(comment_creator_out_, parent);
@@ -386,7 +382,8 @@ std::vector<int> score_paths(const StorageReadInterface& graph,
 std::unique_ptr<function::CallFuncInputBase> bind_ic14(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   if (params.size() < 2) {
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic14 requires 2 arguments: person1Id and person2Id");
@@ -397,7 +394,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic14(
 }
 
 execution::Context exec_ic14(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                             IStorageInterface& graph_iface,
+                             const execution::ParamsMap& params) {
   const auto& args = dynamic_cast<const IC14FuncInput&>(input);
   const int64_t person1_id = params.at("person1Id").GetValue<int64_t>();
   const int64_t person2_id = params.at("person2Id").GetValue<int64_t>();
@@ -413,10 +411,10 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
 
   vid_t src = StorageReadInterface::kInvalidVid;
   vid_t dst = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person1_id), src) ||
-      !graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person2_id), dst)) {
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person1_id),
+                            src) ||
+      !graph.GetVertexIndex(person_label, execution::Value::INT64(person2_id),
+                            dst)) {
     return execution::Context{};
   }
 
@@ -519,7 +517,8 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
 
   std::vector<vid_t> path;
   std::vector<std::vector<vid_t>> paths;
-  dfs_paths(knows_out, knows_in, src, dst, dist_from_src, on_path, &path, &paths);
+  dfs_paths(knows_out, knows_in, src, dst, dist_from_src, on_path, &path,
+            &paths);
   if (paths.empty()) {
     return execution::Context{};
   }
@@ -532,9 +531,8 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
   for (size_t i = 0; i < paths.size(); ++i) {
     order[i] = i;
   }
-  std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
-    return scores[a] > scores[b];
-  });
+  std::sort(order.begin(), order.end(),
+            [&](size_t a, size_t b) { return scores[a] > scores[b]; });
 
   execution::ListColumnBuilder path_ids_builder(DataType(DataTypeId::kInt64));
   execution::ValueColumnBuilder<double> weight_builder;
@@ -546,8 +544,8 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
       ids.emplace_back(execution::Value::INT64(
           graph.GetVertexId(person_label, v).GetValue<int64_t>()));
     }
-    path_ids_builder.push_back_elem(execution::Value::LIST(
-        DataType(DataTypeId::kInt64), std::move(ids)));
+    path_ids_builder.push_back_elem(
+        execution::Value::LIST(DataType(DataTypeId::kInt64), std::move(ids)));
     weight_builder.push_back_opt(static_cast<double>(scores[idx]) / 2.0);
   }
 
@@ -559,8 +557,8 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
 }  // namespace
 
 function::function_set IC14Function::getFunctionSet() {
-  const auto person_ids_in_path_type = common::DataType::List(
-      common::DataType(common::DataTypeId::kInt64));
+  const auto person_ids_in_path_type =
+      common::DataType::List(common::DataType(common::DataTypeId::kInt64));
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC14Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,

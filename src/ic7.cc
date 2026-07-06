@@ -58,16 +58,17 @@ struct LikeResultComparer {
 std::unique_ptr<function::CallFuncInputBase> bind_ic7(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IC7FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 void collect_likes(
-    const StorageReadInterface& graph, const Schema& schema, label_t person_label,
-    label_t message_label, label_t likes_label, label_t has_creator_label,
-    bool is_post, vid_t root,
+    const StorageReadInterface& graph, const Schema& schema,
+    label_t person_label, label_t message_label, label_t likes_label,
+    label_t has_creator_label, bool is_post, vid_t root,
     const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,
     std::vector<LikeResult>* messages) {
   const auto message_has_creator_in = graph.GetGenericIncomingGraphView(
@@ -107,7 +108,8 @@ void collect_likes(
         info.like_date_ms =
             like_accessor.get_typed_data<DateTime>(like_it).milli_second;
       } else if (message_date_col) {
-        info.like_date_ms = message_date_col->get_view(message_vid).milli_second;
+        info.like_date_ms =
+            message_date_col->get_view(message_vid).milli_second;
       }
       messages->push_back(info);
     }
@@ -115,7 +117,8 @@ void collect_likes(
 }
 
 execution::Context exec_ic7(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& ic7_input = dynamic_cast<const IC7FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -128,10 +131,10 @@ execution::Context exec_ic7(const function::CallFuncInputBase& input,
   const label_t likes_label = schema.get_edge_label_id("LIKES");
   const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   auto post_creation_date_col =
       ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
   auto comment_creation_date_col =
@@ -141,8 +144,7 @@ execution::Context exec_ic7(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -270,9 +272,8 @@ execution::Context exec_ic7(const function::CallFuncInputBase& input,
             comment_creation_date_col->get_view(row.message_vid).milli_second;
       }
     }
-    const int32_t minutes =
-        static_cast<int32_t>((row.like_date_ms - message_creation_ms) /
-                             kMillisPerMinute);
+    const int32_t minutes = static_cast<int32_t>(
+        (row.like_date_ms - message_creation_ms) / kMillisPerMinute);
     minutes_latency_builder.push_back_opt(minutes);
     is_new_builder.push_back_opt(!friends[row.person_vid]);
   }
@@ -288,18 +289,19 @@ execution::Context exec_ic7(const function::CallFuncInputBase& input,
   output_columns[6] = minutes_latency_builder.finish();
   output_columns[7] = is_new_builder.finish();
 
-  return ldbc::make_output_context(ic7_input.output_aliases,
-                                   {output_columns[0], output_columns[1],
-                                    output_columns[2], output_columns[3],
-                                    output_columns[4], output_columns[5],
-                                    output_columns[6], output_columns[7]});
+  return ldbc::make_output_context(
+      ic7_input.output_aliases,
+      {output_columns[0], output_columns[1], output_columns[2],
+       output_columns[3], output_columns[4], output_columns[5],
+       output_columns[6], output_columns[7]});
 }
 
 }  // namespace
 
 function::function_set IC7Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
-      IC7Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      IC7Function::name,
+      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"personFirstName", common::DataTypeId::kVarchar},

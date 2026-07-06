@@ -99,7 +99,8 @@ void collect_knows_1d_2d_neighbors(const StorageReadInterface& graph,
 std::unique_ptr<function::CallFuncInputBase> bind_ic5(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   if (params.size() < 2) {
     THROW_INVALID_ARGUMENT_EXCEPTION(
         "ic5 requires 2 arguments: personId and minDate");
@@ -110,7 +111,8 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic5(
 }
 
 execution::Context exec_ic5(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& ic5_input = dynamic_cast<const IC5FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const int64_t min_date_ms = params.at("minDate").GetValue<int64_t>();
@@ -132,8 +134,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -158,7 +159,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
 
   std::vector<vid_t> friends_list;
   collect_knows_1d_2d_neighbors(graph, person_label, knows_label, root,
-                                  &friends_list);
+                                &friends_list);
 
   for (vid_t friend_vid : friends_list) {
     ldbc::foreach_incoming_nbr_gt(
@@ -202,15 +203,17 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
       accessed_forum_set[forum_vid] = false;
     }
     if (que.size() < kTopN) {
-      que.emplace(forum_vid, count,
-                  graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
+      que.emplace(
+          forum_vid, count,
+          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
       continue;
     }
     const auto& top = que.top();
     if (top.post_count < count) {
       que.pop();
-      que.emplace(forum_vid, count,
-                  graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
+      que.emplace(
+          forum_vid, count,
+          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
     } else if (top.post_count == count) {
       const int64_t forum_id =
           graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>();
@@ -228,11 +231,14 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
       }
       accessed_forum_set[forum_vid] = false;
       if (que.size() < kTopN) {
-        que.emplace(forum_vid, 0, graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
+        que.emplace(
+            forum_vid, 0,
+            graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
         continue;
       }
       const auto& top = que.top();
-      const int64_t forum_id = graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>();
+      const int64_t forum_id =
+          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>();
       if (forum_id < top.forum_id) {
         que.pop();
         que.emplace(forum_vid, 0, forum_id);
@@ -248,7 +254,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
     accessed_forum_set.clear();
   }
 
-forum_list.clear();
+  forum_list.clear();
 
   std::vector<ForumInfo> results;
   results.reserve(que.size());

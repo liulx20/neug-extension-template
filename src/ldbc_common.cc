@@ -54,13 +54,13 @@ bool find_message_vertex(const StorageReadInterface& graph, label_t post_label,
                          vid_t* message_vid, bool* is_post) {
   vid_t vid = StorageReadInterface::kInvalidVid;
   if (graph.GetVertexIndex(post_label, execution::Value::INT64(message_id),
-                         vid)) {
+                           vid)) {
     *message_vid = vid;
     *is_post = true;
     return true;
   }
   if (graph.GetVertexIndex(comment_label, execution::Value::INT64(message_id),
-                         vid)) {
+                           vid)) {
     *message_vid = vid;
     *is_post = false;
     return true;
@@ -100,8 +100,7 @@ std::string message_content(const StorageReadInterface& graph,
         get_vertex_column<std::string_view>(graph, post_label, "content");
     auto image_col =
         get_vertex_column<std::string_view>(graph, post_label, "imageFile");
-    auto length_col =
-        get_vertex_column<int32_t>(graph, post_label, "length");
+    auto length_col = get_vertex_column<int32_t>(graph, post_label, "length");
     if (!content_col || !image_col || !length_col) {
       return "";
     }

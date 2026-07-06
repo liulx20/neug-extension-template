@@ -33,14 +33,16 @@ constexpr size_t kNumOutputColumns = 8;
 std::unique_ptr<function::CallFuncInputBase> bind_is1(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IS1FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is1(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& is1_input = dynamic_cast<const IS1FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -50,16 +52,16 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
   const label_t place_label = schema.get_vertex_label_id("PLACE");
   const label_t is_located_in_label = schema.get_edge_label_id("ISLOCATEDIN");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   auto birthday_col =
       ldbc::get_vertex_column<Date>(graph, person_label, "birthday");
-  auto location_ip_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "locationIP");
-  auto browser_used_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "browserUsed");
+  auto location_ip_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "locationIP");
+  auto browser_used_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "browserUsed");
   auto gender_col =
       ldbc::get_vertex_column<std::string_view>(graph, person_label, "gender");
   auto creation_date_col =
@@ -71,15 +73,15 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
   }
 
   vid_t person_vid = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             person_vid)) {
     return execution::Context{};
   }
 
   const auto located_in_out = graph.GetGenericOutgoingGraphView(
       person_label, place_label, is_located_in_label);
-  const vid_t place_vid = ldbc::get_single_out_neighbor(located_in_out, person_vid);
+  const vid_t place_vid =
+      ldbc::get_single_out_neighbor(located_in_out, person_vid);
   int64_t city_id = 0;
   if (place_vid != StorageReadInterface::kInvalidVid) {
     city_id = graph.GetVertexId(place_label, place_vid).GetValue<int64_t>();
@@ -105,8 +107,7 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
       std::string(browser_used_col->get_view(person_vid)));
   city_id_builder.push_back_opt(city_id);
   gender_builder.push_back_opt(std::string(gender_col->get_view(person_vid)));
-  creation_date_builder.push_back_opt(
-      creation_date_col->get_view(person_vid));
+  creation_date_builder.push_back_opt(creation_date_col->get_view(person_vid));
 
   std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
       output_columns;
@@ -119,18 +120,19 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
   output_columns[6] = gender_builder.finish();
   output_columns[7] = creation_date_builder.finish();
 
-  return ldbc::make_output_context(is1_input.output_aliases,
-                                   {output_columns[0], output_columns[1],
-                                    output_columns[2], output_columns[3],
-                                    output_columns[4], output_columns[5],
-                                    output_columns[6], output_columns[7]});
+  return ldbc::make_output_context(
+      is1_input.output_aliases,
+      {output_columns[0], output_columns[1], output_columns[2],
+       output_columns[3], output_columns[4], output_columns[5],
+       output_columns[6], output_columns[7]});
 }
 
 }  // namespace
 
 function::function_set IS1Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
-      IS1Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      IS1Function::name,
+      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
           {"firstName", common::DataTypeId::kVarchar},
           {"lastName", common::DataTypeId::kVarchar},

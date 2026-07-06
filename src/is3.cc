@@ -40,14 +40,16 @@ struct FriendInfo {
 std::unique_ptr<function::CallFuncInputBase> bind_is3(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params = plan.plan(op_idx).opr().procedure_call().query().arguments();
+  const auto& params =
+      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IS3FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
 execution::Context exec_is3(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface, const execution::ParamsMap& params) {
+                            IStorageInterface& graph_iface,
+                            const execution::ParamsMap& params) {
   const auto& is3_input = dynamic_cast<const IS3FuncInput&>(input);
   const int64_t person_id = params.at("personId").GetValue<int64_t>();
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
@@ -56,17 +58,16 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
   const label_t person_label = schema.get_vertex_label_id("PERSON");
   const label_t knows_label = schema.get_edge_label_id("KNOWS");
 
-  auto first_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      ldbc::get_vertex_column<std::string_view>(graph, person_label, "lastName");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
   if (!first_name_col || !last_name_col) {
     THROW_RUNTIME_ERROR("is3: failed to load required LDBC property columns");
   }
 
   vid_t person_vid = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label,
-                            execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             person_vid)) {
     return execution::Context{};
   }
@@ -75,9 +76,8 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
       person_label, person_label, knows_label);
   const auto in_view = graph.GetGenericIncomingGraphView(
       person_label, person_label, knows_label);
-  const bool has_edge_date =
-      schema.edge_has_property(person_label, person_label, knows_label,
-                               "creationDate");
+  const bool has_edge_date = schema.edge_has_property(
+      person_label, person_label, knows_label, "creationDate");
   EdgeDataAccessor edge_accessor;
   if (has_edge_date) {
     edge_accessor = graph.GetEdgeDataAccessor(person_label, person_label,
@@ -145,7 +145,8 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
 
 function::function_set IS3Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
-      IS3Function::name, std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      IS3Function::name,
+      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
           {"personId", common::DataTypeId::kInt64},
           {"firstName", common::DataTypeId::kVarchar},
