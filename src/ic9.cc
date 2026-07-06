@@ -52,71 +52,48 @@ struct MessageInfoComparer {
   }
 };
 
-void consider_message(
-    std::priority_queue<MessageInfo, std::vector<MessageInfo>,
-                        MessageInfoComparer>& pq,
-    const MessageInfo& candidate) {
-  if (pq.size() < kTopN) {
-    pq.push(candidate);
-    return;
-  }
-  const auto& worst = pq.top();
-  if (candidate.creation_date_ms > worst.creation_date_ms) {
-    pq.pop();
-    pq.push(candidate);
-    return;
-  }
-  if (candidate.creation_date_ms == worst.creation_date_ms &&
-      candidate.message_id < worst.message_id) {
-    pq.pop();
-    pq.push(candidate);
-  }
-}
 
 void scan_messages(
-    const StorageReadInterface& graph, label_t person_label,
-    label_t message_label, label_t has_creator_label, bool is_post,
-    vid_t friend_vid, int64_t max_date_ms, bool use_edge_date,
+    const StorageReadInterface& graph,
+    const ldbc::DateTimeIncomingView& has_creator_in, label_t message_label,
+    bool is_post, vid_t friend_vid, int64_t max_date_ms,
     const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                         MessageInfoComparer>& pq) {
-  if (use_edge_date) {
+
     ldbc::foreach_incoming_nbr_between(
-        graph, person_label, message_label, has_creator_label, friend_vid, 0,
-        max_date_ms, [&](vid_t message_vid, const DateTime& creation_date) {
+        has_creator_in, friend_vid, 0, max_date_ms,
+        [&](vid_t message_vid, const DateTime& creation_date) {
           MessageInfo info;
           info.message_vid = message_vid;
           info.person_vid = friend_vid;
-          info.message_id =
-              graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
           info.creation_date_ms = creation_date.milli_second;
           info.is_post = is_post;
-          consider_message(pq, info);
+          if (pq.size() < kTopN) {
+            info.message_id =
+                graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+            pq.push(info);
+            return;
+          }
+          const auto& worst = pq.top();
+          if (info.creation_date_ms > worst.creation_date_ms) {
+            pq.pop();
+            info.message_id =
+                graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+            pq.push(info);
+            return;
+          }
+          info.message_id =
+                graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
+          if (info.creation_date_ms == worst.creation_date_ms &&
+              info.message_id < worst.message_id) {
+            pq.pop();
+            pq.push(info);
+          }
         });
-    return;
-  }
+  
 
-  const auto in_view = graph.GetGenericIncomingGraphView(
-      person_label, message_label, has_creator_label);
-  const auto posts = in_view.get_edges(friend_vid);
-  for (auto it = posts.begin(); it != posts.end(); ++it) {
-    const vid_t message_vid = *it;
-    int64_t created = 0;
-    if (message_date_col) {
-      created = message_date_col->get_view(message_vid).milli_second;
-    }
-    if (created >= max_date_ms) {
-      continue;
-    }
-    MessageInfo info;
-    info.message_vid = message_vid;
-    info.person_vid = friend_vid;
-    info.message_id =
-        graph.GetVertexId(message_label, message_vid).GetValue<int64_t>();
-    info.creation_date_ms = created;
-    info.is_post = is_post;
-    consider_message(pq, info);
-  }
+
 }
 
 std::unique_ptr<function::CallFuncInputBase> bind_ic9(
@@ -164,21 +141,21 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
     return execution::Context{};
   }
 
-  const bool post_edge_date = schema.edge_has_property(
-      post_label, person_label, has_creator_label, "creationDate");
-  const bool comment_edge_date = schema.edge_has_property(
-      comment_label, person_label, has_creator_label, "creationDate");
+
+
+  const auto post_has_creator_in = ldbc::get_typed_incoming_view(
+      graph, person_label, post_label, has_creator_label);
+  const auto comment_has_creator_in = ldbc::get_typed_incoming_view(
+      graph, person_label, comment_label, has_creator_label);
 
   std::priority_queue<MessageInfo, std::vector<MessageInfo>, MessageInfoComparer>
       pq;
   ldbc::foreach_knows_1d_2d_neighbor(
       graph, person_label, knows_label, root, [&](vid_t friend_vid) {
-        scan_messages(graph, person_label, post_label, has_creator_label, true,
-                      friend_vid, max_date_ms, post_edge_date,
-                      post_date_col.get(), pq);
-        scan_messages(graph, person_label, comment_label, has_creator_label,
-                      false, friend_vid, max_date_ms, comment_edge_date,
-                      comment_date_col.get(), pq);
+        scan_messages(graph, post_has_creator_in, post_label, true, friend_vid,
+                      max_date_ms, post_date_col.get(), pq);
+        scan_messages(graph, comment_has_creator_in, comment_label, false,
+                      friend_vid, max_date_ms, comment_date_col.get(), pq);
       });
 
   std::vector<MessageInfo> results;

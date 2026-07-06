@@ -61,25 +61,8 @@ struct PersonResultComparer {
   }
 };
 
-int64_t parse_i64_arg(const ::common::Value& value, const char* arg_name) {
-  if (value.has_i64()) {
-    return value.i64();
-  }
-  if (value.has_i32()) {
-    return value.i32();
-  }
-  THROW_INVALID_ARGUMENT_EXCEPTION(
-      std::string("ic3: argument ") + arg_name + " must be an integer");
-}
 
-std::string parse_string_arg(const ::common::Value& value,
-                             const char* arg_name) {
-  if (value.has_str()) {
-    return value.str();
-  }
-  THROW_INVALID_ARGUMENT_EXCEPTION(
-      std::string("ic3: argument ") + arg_name + " must be a string");
-}
+
 
 template <typename T>
 std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(
@@ -90,15 +73,6 @@ std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(
       col);
 }
 
-size_t count_edges(const CsrView& view, vid_t vertex) {
-  size_t count = 0;
-  for (auto it = view.get_edges(vertex).begin(); it != view.get_edges(vertex).end();
-       ++it) {
-    ++count;
-  }
-  return count;
-}
-
 vid_t get_single_out_neighbor(const CsrView& view, vid_t vertex) {
   for (auto it = view.get_edges(vertex).begin(); it != view.get_edges(vertex).end();
        ++it) {
@@ -107,26 +81,7 @@ vid_t get_single_out_neighbor(const CsrView& view, vid_t vertex) {
   return StorageReadInterface::kInvalidVid;
 }
 
-void consider_person(
-    std::priority_queue<PersonResult, std::vector<PersonResult>,
-                        PersonResultComparer>& pq,
-    const PersonResult& candidate) {
-  if (pq.size() < kTopN) {
-    pq.push(candidate);
-    return;
-  }
-  const auto& worst = pq.top();
-  if (candidate.total > worst.total) {
-    pq.pop();
-    pq.push(candidate);
-    return;
-  }
-  if (candidate.total == worst.total &&
-      candidate.person_id < worst.person_id) {
-    pq.pop();
-    pq.push(candidate);
-  }
-}
+
 
 std::unique_ptr<function::CallFuncInputBase> bind_ic3(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
@@ -206,173 +161,64 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
   }
 
   const auto person_set = graph.GetVertexSet(person_label);
-  std::vector<bool> city_in_country_x_or_y(place_set.size(), false);
+  std::vector<uint8_t> city_in_country_x_or_y(place_set.size(), 0);
 
   const auto city_in_country = graph.GetGenericIncomingGraphView(
       place_label, place_label, is_part_of_label);
-  for (auto it = city_in_country.get_edges(country_x).begin();
-       it != city_in_country.get_edges(country_x).end(); ++it) {
-    const vid_t city_vid = *it;
-    if (city_vid < city_in_country_x_or_y.size()) {
-      city_in_country_x_or_y[city_vid] = true;
-    }
+  const auto& city_in_country_x = city_in_country.get_edges(country_x);
+  const auto& city_in_country_y = city_in_country.get_edges(country_y);
+  for (auto it = city_in_country_x.begin(); it != city_in_country_x.end(); ++it) {
+    city_in_country_x_or_y[*it] = 1;
   }
-  for (auto it = city_in_country.get_edges(country_y).begin();
-       it != city_in_country.get_edges(country_y).end(); ++it) {
-    const vid_t city_vid = *it;
-    if (city_vid < city_in_country_x_or_y.size()) {
-      city_in_country_x_or_y[city_vid] = true;
-    }
+  for (auto it = city_in_country_y.begin(); it != city_in_country_y.end(); ++it) {
+    city_in_country_x_or_y[*it] = 1;
   }
 
   const auto person_located_in = graph.GetGenericOutgoingGraphView(
       person_label, place_label, is_located_in_label);
-  const auto post_has_creator = graph.GetGenericOutgoingGraphView(
-      post_label, person_label, has_creator_label);
-  const auto comment_has_creator = graph.GetGenericOutgoingGraphView(
-      comment_label, person_label, has_creator_label);
   const auto post_located_in = graph.GetGenericOutgoingGraphView(
       post_label, place_label, is_located_in_label);
   const auto comment_located_in = graph.GetGenericOutgoingGraphView(
       comment_label, place_label, is_located_in_label);
-  const auto post_in_country = graph.GetGenericIncomingGraphView(
-      place_label, post_label, is_located_in_label);
-  const auto comment_in_country = graph.GetGenericIncomingGraphView(
-      place_label, comment_label, is_located_in_label);
-  const auto post_creator_in = graph.GetGenericIncomingGraphView(
-      person_label, post_label, has_creator_label);
-  const auto comment_creator_in = graph.GetGenericIncomingGraphView(
-      person_label, comment_label, has_creator_label);
-  const bool post_has_creator_date = schema.edge_has_property(
-      post_label, person_label, has_creator_label, "creationDate");
-  const bool comment_has_creator_date = schema.edge_has_property(
-      comment_label, person_label, has_creator_label, "creationDate");
-  EdgeDataAccessor post_creator_accessor;
-  EdgeDataAccessor comment_creator_accessor;
-  if (post_has_creator_date) {
-    post_creator_accessor = graph.GetEdgeDataAccessor(
-        post_label, person_label, has_creator_label, "creationDate");
-  }
-  if (comment_has_creator_date) {
-    comment_creator_accessor = graph.GetEdgeDataAccessor(
-        comment_label, person_label, has_creator_label, "creationDate");
-  }
 
-  std::vector<bool> is_friend(person_set.size(), false);
+
+  
+
   std::vector<vid_t> friends;
-  size_t friend_messages_num = 0;
-  ldbc::foreach_knows_1d_2d_neighbor(
+    ldbc::foreach_knows_1d_2d_neighbor(
       graph, person_label, knows_label, root, [&](vid_t friend_vid) {
         const vid_t city_vid =
             get_single_out_neighbor(person_located_in, friend_vid);
-        if (city_vid != StorageReadInterface::kInvalidVid &&
-            city_vid < city_in_country_x_or_y.size() &&
-            city_in_country_x_or_y[city_vid]) {
+        if (city_in_country_x_or_y[city_vid]) {
           return;
         }
-        if (friend_vid < is_friend.size()) {
-          is_friend[friend_vid] = true;
-        }
         friends.push_back(friend_vid);
-        friend_messages_num += count_edges(post_creator_in, friend_vid);
-        friend_messages_num += count_edges(comment_creator_in, friend_vid);
-      });
-
-  const size_t country_xy_messages_num =
-      count_edges(post_in_country, country_x) +
-      count_edges(comment_in_country, country_x) +
-      count_edges(post_in_country, country_y) +
-      count_edges(comment_in_country, country_y);
-
-  const int64_t end_date_ms =
+     });
+     const int64_t end_date_ms =
       start_date_ms + duration_days * kMillisPerDay;
 
-  auto in_date_range = [&](int64_t creation_ms) {
-    return creation_ms >= start_date_ms &&
-           creation_ms < end_date_ms;
-  };
+
+
+
+  const auto post_has_creator_in = ldbc::get_typed_incoming_view(
+      graph, person_label, post_label, has_creator_label);
+  const auto comment_has_creator_in = ldbc::get_typed_incoming_view(
+      graph, person_label, comment_label, has_creator_label);
 
   std::priority_queue<PersonResult, std::vector<PersonResult>,
                       PersonResultComparer>
       pq;
 
-  if (friend_messages_num > country_xy_messages_num) {
-    std::vector<std::pair<int, int>> counts(person_set.size(), {0, 0});
 
-    auto scan_country_messages = [&](vid_t country_vid, bool is_x,
-                                     label_t message_label,
-                                     const CsrView& message_in_country,
-                                     const CsrView& message_has_creator,
-                                     bool has_creator_date,
-                                     const EdgeDataAccessor& creator_accessor,
-                                     const StorageReadInterface::vertex_column_t<
-                                         DateTime>* message_date_col) {
-      for (auto it = message_in_country.get_edges(country_vid).begin();
-           it != message_in_country.get_edges(country_vid).end(); ++it) {
-        const vid_t message_vid = *it;
-        for (auto cit = message_has_creator.get_edges(message_vid).begin();
-             cit != message_has_creator.get_edges(message_vid).end(); ++cit) {
-          int64_t creation_ms = 0;
-          if (has_creator_date) {
-            creation_ms =
-                creator_accessor.get_typed_data<DateTime>(cit).milli_second;
-          } else if (message_date_col) {
-            creation_ms = message_date_col->get_view(message_vid).milli_second;
-          }
-          if (!in_date_range(creation_ms)) {
-            continue;
-          }
-          const vid_t person_vid = *cit;
-          if (person_vid < is_friend.size() && is_friend[person_vid]) {
-            if (is_x) {
-              counts[person_vid].first += 1;
-            } else {
-              counts[person_vid].second += 1;
-            }
-          }
-        }
-      }
-    };
-
-    scan_country_messages(country_x, true, post_label, post_in_country,
-                          post_has_creator, post_has_creator_date,
-                          post_creator_accessor, post_creation_date_col.get());
-    scan_country_messages(country_x, true, comment_label, comment_in_country,
-                          comment_has_creator, comment_has_creator_date,
-                          comment_creator_accessor,
-                          comment_creation_date_col.get());
-    scan_country_messages(country_y, false, post_label, post_in_country,
-                          post_has_creator, post_has_creator_date,
-                          post_creator_accessor, post_creation_date_col.get());
-    scan_country_messages(country_y, false, comment_label, comment_in_country,
-                          comment_has_creator, comment_has_creator_date,
-                          comment_creator_accessor,
-                          comment_creation_date_col.get());
-
-    for (vid_t friend_vid : friends) {
-      const auto& count = counts[friend_vid];
-      if (count.first == 0 || count.second == 0) {
-        continue;
-      }
-      PersonResult row;
-      row.person_vid = friend_vid;
-      row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
-      row.count_x = count.first;
-      row.count_y = count.second;
-      row.total = count.first + count.second;
-      consider_person(pq, row);
-    }
-  } else {
     for (vid_t friend_vid : friends) {
       int x_count = 0;
       int y_count = 0;
 
-      auto scan_friend_messages = [&](label_t message_label,
-                                      const CsrView& located_in_view) {
+      auto scan_friend_messages = [&](const CsrView& located_in_view,
+                                      const ldbc::DateTimeIncomingView&
+                                          has_creator_in) {
         ldbc::foreach_incoming_nbr_between_half_open(
-            graph, person_label, message_label, has_creator_label, friend_vid,
-            start_date_ms, end_date_ms,
+            has_creator_in, friend_vid, start_date_ms, end_date_ms,
             [&](vid_t message_vid, const DateTime& /*creation_date*/) {
               const vid_t locate =
                   get_single_out_neighbor(located_in_view, message_vid);
@@ -384,21 +230,39 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
             });
       };
 
-      scan_friend_messages(post_label, post_located_in);
-      scan_friend_messages(comment_label, comment_located_in);
+      scan_friend_messages(post_located_in, post_has_creator_in);
+      scan_friend_messages(comment_located_in, comment_has_creator_in);
 
       if (x_count == 0 || y_count == 0) {
         continue;
       }
       PersonResult row;
       row.person_vid = friend_vid;
-      row.person_id =
-          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
       row.count_x = x_count;
       row.count_y = y_count;
       row.total = x_count + y_count;
-      consider_person(pq, row);
-    }
+       if (pq.size() < kTopN) {
+   row.person_id =
+          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+      
+    pq.push(row);
+    continue;
+  }
+  const auto& worst = pq.top();
+  if (row.total > worst.total) {
+    pq.pop();
+    row.person_id =
+          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+    pq.push(row);
+    continue;
+  }
+  row.person_id =
+          graph.GetVertexId(person_label, friend_vid).GetValue<int64_t>();
+  if (row.total == worst.total &&
+      row.person_id < worst.person_id) {
+    pq.pop();
+    pq.push(row);
+  }
   }
 
   std::vector<PersonResult> results;

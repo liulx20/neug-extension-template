@@ -226,33 +226,32 @@ vid_t find_vertex_by_string_prop(const StorageReadInterface& graph,
                                  label_t label, const std::string& prop_name,
                                  const std::string& value);
 
-inline TypedCsrView<DateTime, CsrViewType::kMultipleMutable>
-get_typed_incoming_view(const StorageReadInterface& graph, label_t dst_label,
-                        label_t src_label, label_t edge_label) {
+using DateTimeIncomingView =
+    TypedCsrView<DateTime, CsrViewType::kMultipleMutable>;
+
+inline DateTimeIncomingView get_typed_incoming_view(
+    const StorageReadInterface& graph, label_t dst_label, label_t src_label,
+    label_t edge_label) {
   const auto view = graph.GetGenericIncomingGraphView(dst_label, src_label,
                                                       edge_label);
   return view.get_typed_view<DateTime, CsrViewType::kMultipleMutable>();
 }
 
 template <typename Func>
-inline void foreach_incoming_nbr_lt(const StorageReadInterface& graph,
-                                    label_t dst_label, label_t src_label,
-                                    label_t edge_label, vid_t dst_vid,
-                                    const DateTime& threshold, Func&& func) {
-  get_typed_incoming_view(graph, dst_label, src_label, edge_label)
-      .foreach_nbr_lt(dst_vid, threshold,
+inline void foreach_incoming_nbr_lt(const DateTimeIncomingView& view,
+                                    vid_t dst_vid, const DateTime& threshold,
+                                    Func&& func) {
+  view.foreach_nbr_lt(dst_vid, threshold,
                       [&](vid_t nbr, const DateTime& edge_data) {
                         std::forward<Func>(func)(nbr, edge_data);
                       });
 }
 
 template <typename Func>
-inline void foreach_incoming_nbr_gt(const StorageReadInterface& graph,
-                                    label_t dst_label, label_t src_label,
-                                    label_t edge_label, vid_t dst_vid,
-                                    const DateTime& threshold, Func&& func) {
-  get_typed_incoming_view(graph, dst_label, src_label, edge_label)
-      .foreach_nbr_gt(dst_vid, threshold,
+inline void foreach_incoming_nbr_gt(const DateTimeIncomingView& view,
+                                    vid_t dst_vid, const DateTime& threshold,
+                                    Func&& func) {
+  view.foreach_nbr_gt(dst_vid, threshold,
                       [&](vid_t nbr, const DateTime& edge_data) {
                         std::forward<Func>(func)(nbr, edge_data);
                       });
@@ -261,14 +260,11 @@ inline void foreach_incoming_nbr_gt(const StorageReadInterface& graph,
 // Flex foreach_edges_between(v, minDate, maxDate) on incoming DateTime CSR:
 // keep edges with minDate <= creationDate <= maxDate (inclusive).
 template <typename Func>
-inline void foreach_incoming_nbr_between(const StorageReadInterface& graph,
-                                         label_t dst_label, label_t src_label,
-                                         label_t edge_label, vid_t dst_vid,
-                                         int64_t min_date_ms,
+inline void foreach_incoming_nbr_between(const DateTimeIncomingView& view,
+                                         vid_t dst_vid, int64_t min_date_ms,
                                          int64_t max_date_ms, Func&& func) {
   foreach_incoming_nbr_lt(
-      graph, dst_label, src_label, edge_label, dst_vid,
-      DateTime(max_date_ms + 1),
+      view, dst_vid, DateTime(max_date_ms + 1),
       [&](vid_t nbr, const DateTime& edge_data) {
         if (edge_data.milli_second < min_date_ms) {
           return;
@@ -280,11 +276,10 @@ inline void foreach_incoming_nbr_between(const StorageReadInterface& graph,
 // Flex foreach_edges_between with an exclusive upper bound: [minDate, maxDate).
 template <typename Func>
 inline void foreach_incoming_nbr_between_half_open(
-    const StorageReadInterface& graph, label_t dst_label, label_t src_label,
-    label_t edge_label, vid_t dst_vid, int64_t min_date_ms, int64_t max_date_ms,
-    Func&& func) {
+    const DateTimeIncomingView& view, vid_t dst_vid, int64_t min_date_ms,
+    int64_t max_date_ms, Func&& func) {
   foreach_incoming_nbr_lt(
-      graph, dst_label, src_label, edge_label, dst_vid, DateTime(max_date_ms),
+      view, dst_vid, DateTime(max_date_ms),
       [&](vid_t nbr, const DateTime& edge_data) {
         if (edge_data.milli_second < min_date_ms) {
           return;

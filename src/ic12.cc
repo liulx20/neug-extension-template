@@ -169,7 +169,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
                                        post_has_tag_out.get_edges(post_vid);
                                    for (auto tit = tags.begin(); tit != tags.end();
                                         ++tit) {
-                                     if (*tit < tag_set.size() && tag_set[*tit]) {
+                                     if (tag_set[*tit]) {
                                        ++count;
                                        break;
                                      }
@@ -178,19 +178,30 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
                                  if (count == 0) {
                                    return;
                                  }
+                                 if (pq.size() < kTopN) {
+
                                  const int64_t friend_id =
                                      graph.GetVertexId(person_label, friend_vid)
                                          .GetValue<int64_t>();
-                                 if (pq.size() < kTopN) {
                                    pq.push({count, friend_vid, friend_id});
                                    if (pq.size() == kTopN) {
                                      min_count = pq.top().reply_count;
                                    }
+                                   return;
                                  } else if (count > min_count) {
                                    pq.pop();
+
+                                 const int64_t friend_id =
+                                     graph.GetVertexId(person_label, friend_vid)
+                                         .GetValue<int64_t>();
                                    pq.push({count, friend_vid, friend_id});
                                    min_count = pq.top().reply_count;
-                                 } else if (count == min_count &&
+                                   return;
+                                 } 
+                                 const int64_t friend_id =
+                                     graph.GetVertexId(person_label, friend_vid)
+                                         .GetValue<int64_t>();
+                                 if (count == min_count &&
                                             friend_id < pq.top().person_id) {
                                    pq.pop();
                                    pq.push({count, friend_vid, friend_id});

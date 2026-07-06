@@ -49,37 +49,82 @@ int32_t shortest_path_length(const StorageReadInterface& graph,
     return 0;
   }
   const size_t person_num = graph.GetVertexSet(person_label).size();
-  std::vector<int32_t> dist(person_num, -1);
-  std::queue<vid_t> q;
-  dist[src] = 0;
-  q.push(src);
+  std::vector<int32_t> dist(person_num, 0);
+  std::queue<vid_t> q1;
+  std::queue<vid_t> q2;
+  std::queue<vid_t> tmp;
 
-  const auto knows_out = graph.GetGenericOutgoingGraphView(
+  dist[src] = 1;
+  dist[dst] = -1;
+  q1.push(src);
+  q2.push(dst);
+
+  const auto person_knows_out = graph.GetGenericOutgoingGraphView(
       person_label, person_label, knows_label);
-  const auto knows_in = graph.GetGenericIncomingGraphView(
+  const auto person_knows_in = graph.GetGenericIncomingGraphView(
       person_label, person_label, knows_label);
 
-  while (!q.empty()) {
-    const vid_t x = q.front();
-    q.pop();
-    const auto relax = [&](vid_t v) {
-      if (v == StorageReadInterface::kInvalidVid || dist[v] != -1) {
-        return;
+
+  while(true) {
+    if(q1.size() <= q2.size()){
+      if(q1.empty()) {
+        break;
       }
-      dist[v] = dist[x] + 1;
-      q.push(v);
-    };
-    const auto out_edges = knows_out.get_edges(x);
-    for (auto it = out_edges.begin(); it != out_edges.end(); ++it) {
-      relax(*it);
+      while(!q1.empty()){
+        auto x = q1.front();
+        q1.pop();
+        const auto& oe = person_knows_out.get_edges(x);
+        for(auto it = oe.begin(); it != oe.end(); ++it){
+          auto v = *it;
+          if(dist[v] == 0){
+            dist[v] = dist[x] + 1;
+            tmp.push(v);
+          }else if(dist[v] < 0){
+            return dist[x] - dist[v] - 1;
+          }
+        }
+        const auto& ie = person_knows_in.get_edges(x);
+        for(auto it = ie.begin(); it != ie.end(); ++it){
+          auto v = *it;
+          if(dist[v] == 0){
+            dist[v] = dist[x] + 1;
+            tmp.push(v);
+          }else if(dist[v] < 0){
+            return dist[x] - dist[v] - 1;
+          }
+      }
     }
-    const auto in_edges = knows_in.get_edges(x);
-    for (auto it = in_edges.begin(); it != in_edges.end(); ++it) {
-      relax(*it);
+    std::swap(q1, tmp);
+  }else{
+    if(q2.empty()){
+      break;
     }
-    if (dist[dst] != -1) {
-      return dist[dst];
+    while(!q2.empty()){
+      auto x = q2.front();
+      q2.pop();
+      const auto& oe = person_knows_out.get_edges(x);
+      for(auto it = oe.begin(); it != oe.end(); ++it){
+        auto v = *it;
+        if(dist[v] == 0){
+          dist[v] = dist[x] + 1;
+          tmp.push(v);
+        }else if(dist[v] > 0){
+          return dist[v] - dist[x] - 1;
+        }
+      }
+      const auto& ie = person_knows_in.get_edges(x);
+      for(auto it = ie.begin(); it != ie.end(); ++it){
+        auto v = *it;
+        if(dist[v] == 0){
+          dist[v] = dist[x] + 1;
+          tmp.push(v);
+        }else if(dist[v] > 0){
+          return dist[v] - dist[x] - 1;
+        }
+      }
     }
+    std::swap(q2, tmp);
+  }
   }
   return -1;
 }

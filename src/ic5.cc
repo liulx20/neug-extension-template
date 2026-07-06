@@ -153,17 +153,17 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
       post_label, forum_label, container_of_label);
   const DateTime min_date(min_date_ms);
 
+  const auto has_member_in = ldbc::get_typed_incoming_view(
+      graph, person_label, forum_label, has_member_label);
+
   std::vector<vid_t> friends_list;
   collect_knows_1d_2d_neighbors(graph, person_label, knows_label, root,
                                   &friends_list);
 
   for (vid_t friend_vid : friends_list) {
     ldbc::foreach_incoming_nbr_gt(
-        graph, person_label, forum_label, has_member_label, friend_vid,
-        min_date, [&](vid_t forum_vid, const DateTime& /*join_date*/) {
-          if (forum_vid >= forum_num) {
-            return;
-          }
+        has_member_in, friend_vid, min_date,
+        [&](vid_t forum_vid, const DateTime& /*join_date*/) {
           person_forum_set[forum_vid] = true;
           person_forum_list.push_back(forum_vid);
           if (!accessed_forum_set[forum_vid]) {
@@ -178,9 +178,6 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
     const auto posts = post_has_creator_in.get_edges(friend_vid);
     for (auto it = posts.begin(); it != posts.end(); ++it) {
       const vid_t post_vid = *it;
-      if (ldbc::count_edges(forum_container_of_post_in, post_vid) == 0) {
-        continue;
-      }
       const vid_t forum_vid =
           ldbc::get_single_out_neighbor(forum_container_of_post_in, post_vid);
       if (forum_vid >= forum_num || !person_forum_set[forum_vid]) {
@@ -230,13 +227,12 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
         continue;
       }
       accessed_forum_set[forum_vid] = false;
-      const int64_t forum_id =
-          graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>();
       if (que.size() < kTopN) {
-        que.emplace(forum_vid, 0, forum_id);
+        que.emplace(forum_vid, 0, graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>());
         continue;
       }
       const auto& top = que.top();
+      const int64_t forum_id = graph.GetVertexId(forum_label, forum_vid).GetValue<int64_t>();
       if (forum_id < top.forum_id) {
         que.pop();
         que.emplace(forum_vid, 0, forum_id);
@@ -249,8 +245,10 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
       }
     }
   } else {
-    accessed_forum_set.assign(forum_num, false);
+    accessed_forum_set.clear();
   }
+
+forum_list.clear();
 
   std::vector<ForumInfo> results;
   results.reserve(que.size());

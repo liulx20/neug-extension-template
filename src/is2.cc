@@ -72,11 +72,12 @@ void consider_message(std::priority_queue<MessageInfo, std::vector<MessageInfo>,
 }
 
 void scan_person_messages(
-    const StorageReadInterface& graph, const Schema& schema, label_t person_label,
-    label_t message_label, label_t has_creator_label, bool is_post,
-    vid_t person_vid,
+    const StorageReadInterface& graph, const Schema& schema,
+    const ldbc::DateTimeIncomingView& has_creator_in, label_t person_label,
+    label_t message_label, bool is_post, vid_t person_vid,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                         MessageInfoComparer>& pq) {
+  const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
   const bool has_edge_date = schema.edge_has_property(
       message_label, person_label, has_creator_label, "creationDate");
   auto vertex_date_col = ldbc::get_vertex_column<DateTime>(
@@ -84,8 +85,8 @@ void scan_person_messages(
 
   if (has_edge_date) {
     ldbc::foreach_incoming_nbr_gt(
-        graph, person_label, message_label, has_creator_label, person_vid,
-        DateTime(-1), [&](vid_t message_vid, const DateTime& creation_date) {
+        has_creator_in, person_vid, DateTime(-1),
+        [&](vid_t message_vid, const DateTime& creation_date) {
           MessageInfo info;
           info.message_vid = message_vid;
           info.message_id =
@@ -153,12 +154,17 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
     return execution::Context{};
   }
 
+  const auto post_has_creator_in = ldbc::get_typed_incoming_view(
+      graph, person_label, post_label, has_creator_label);
+  const auto comment_has_creator_in = ldbc::get_typed_incoming_view(
+      graph, person_label, comment_label, has_creator_label);
+
   std::priority_queue<MessageInfo, std::vector<MessageInfo>, MessageInfoComparer>
       pq;
-  scan_person_messages(graph, schema, person_label, post_label, has_creator_label,
-                       true, person_vid, pq);
-  scan_person_messages(graph, schema, person_label, comment_label,
-                       has_creator_label, false, person_vid, pq);
+  scan_person_messages(graph, schema, post_has_creator_in, person_label,
+                       post_label, true, person_vid, pq);
+  scan_person_messages(graph, schema, comment_has_creator_in, person_label,
+                       comment_label, false, person_vid, pq);
 
   std::vector<MessageInfo> results;
   results.reserve(pq.size());
