@@ -23,25 +23,34 @@ The extension name is still `wiggle` (from the upstream [neug-extension-template
 ## Prerequisites
 
 - CMake >= 3.16, C++20 compiler, OpenSSL dev headers
-- NeuG source tree (sibling checkout or submodule)
+- NeuG source (git submodule `./neug`, or a sibling/`NEUG_SRCDIR` checkout)
 
 ## Build
 
-Place NeuG next to this repo (recommended for local dev):
-
-```text
-workspace/
-  neug/
-  neug-extension-template/   # this repo
-```
-
-Then from this directory:
+NeuG is vendored as a git submodule (same idea as DuckDB's `./duckdb`):
 
 ```sh
+git submodule update --init --recursive
 make
 ```
 
-The Makefile resolves NeuG in order: `NEUG_SRCDIR` env → `./neug` submodule → `../neug` sibling.
+Layout after init:
+
+```text
+neug-extension-template/
+  neug/                      # submodule (liulx20/neug@extension)
+  Makefile
+  ...
+```
+
+Alternatively, point at an existing NeuG tree:
+
+```sh
+NEUG_SRCDIR=/path/to/neug make
+# or place a checkout at ../neug
+```
+
+The Makefile resolves NeuG in order: `NEUG_SRCDIR` → `./neug` submodule → `../neug` sibling.
 
 Artifacts:
 

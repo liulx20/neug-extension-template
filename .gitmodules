@@ -1,6 +1,6 @@
-# Optional NeuG submodule for local development.
-# CI clones NeuG separately in MainDistributionPipeline.yml.
+# NeuG is required to build this out-of-tree extension (same pattern as duckdb/extension-template).
+# After clone: git submodule update --init --recursive
 [submodule "neug"]
 	path = neug
-	url = https://github.com/alibaba/neug.git
-	branch = main
+	url = https://github.com/liulx20/neug.git
+	branch = extension
