@@ -276,10 +276,6 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
   auto org_name_col =
       ldbc::get_vertex_column<std::string_view>(graph, org_label, "name");
 
-  if (!first_name_col || !last_name_col || !birthday_col || !gender_col ||
-      !place_name_col || !org_name_col) {
-    THROW_RUNTIME_ERROR("ic1: failed to load required LDBC property columns");
-  }
 
   vid_t root = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),

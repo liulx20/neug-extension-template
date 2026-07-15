@@ -27,7 +27,7 @@ The extension name is still `wiggle` (from the upstream [neug-extension-template
 
 ## Build
 
-NeuG is vendored as a git submodule (same idea as DuckDB's `./duckdb`):
+NeuG is vendored as a git submodule:
 
 ```sh
 git submodule update --init --recursive
