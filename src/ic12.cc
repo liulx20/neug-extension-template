@@ -58,8 +58,8 @@ struct PersonResultComparer {
 void collect_tags_in_class(const StorageReadInterface& graph,
                            label_t tag_class_label, label_t tag_label,
                            label_t has_type_label, label_t is_subclass_of_label,
-                           vid_t tag_class_vid, std::vector<bool>* tag_set) {
-  tag_set->assign(graph.GetVertexSet(tag_label).size(), false);
+                           vid_t tag_class_vid, std::vector<uint8_t>* tag_set) {
+  tag_set->assign(graph.GetVertexSet(tag_label).size(), 0);
   const auto subclass_in = graph.GetGenericIncomingGraphView(
       tag_class_label, tag_class_label, is_subclass_of_label);
   const auto tag_has_type_in = graph.GetGenericIncomingGraphView(
@@ -76,7 +76,7 @@ void collect_tags_in_class(const StorageReadInterface& graph,
     }
     const auto tags = tag_has_type_in.get_edges(current);
     for (auto it = tags.begin(); it != tags.end(); ++it) {
-      (*tag_set)[*it] = true;
+      (*tag_set)[*it] = 1;
     }
   }
 }
@@ -84,12 +84,6 @@ void collect_tags_in_class(const StorageReadInterface& graph,
 std::unique_ptr<function::CallFuncInputBase> bind_ic12(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params =
-      plan.plan(op_idx).opr().procedure_call().query().arguments();
-  if (params.size() < 2) {
-    THROW_INVALID_ARGUMENT_EXCEPTION(
-        "ic12 requires 2 arguments: personId and tagClassName");
-  }
   auto input = std::make_unique<IC12FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
@@ -140,7 +134,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
     return execution::Context{};
   }
 
-  std::vector<bool> tag_set;
+  std::vector<uint8_t> tag_set;
   collect_tags_in_class(graph, tag_class_label, tag_label, has_type_label,
                         is_subclass_of_label, tag_class_vid, &tag_set);
 

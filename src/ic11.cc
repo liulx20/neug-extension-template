@@ -118,13 +118,11 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
       place_label, org_label, is_located_in_label);
   const auto person_work_at_in =
       graph.GetGenericIncomingGraphView(org_label, person_label, work_at_label);
-  const bool has_work_from = schema.edge_has_property(
-      person_label, org_label, work_at_label, "workFrom");
-  EdgeDataAccessor work_from_accessor;
-  if (has_work_from) {
-    work_from_accessor = graph.GetEdgeDataAccessor(person_label, org_label,
+
+ 
+  const auto& work_from_accessor = graph.GetEdgeDataAccessor(person_label, org_label,
                                                    work_at_label, "workFrom");
-  }
+  
 
   std::priority_queue<WorkResult, std::vector<WorkResult>, WorkResultComparer>
       pq;
@@ -135,14 +133,13 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
     const auto workers = person_work_at_in.get_edges(company_vid);
     for (auto wit = workers.begin(); wit != workers.end(); ++wit) {
       const vid_t person_vid = *wit;
-      int work_from = 0;
-      if (has_work_from) {
-        work_from = work_from_accessor.get_typed_data<int32_t>(wit);
-      }
+   
+      const int32_t work_from = work_from_accessor.get_typed_data<int32_t>(wit);
+      
       if (work_from >= work_from_year) {
         continue;
       }
-      if (person_vid >= friends.size() || !friends[person_vid]) {
+      if (!friends[person_vid]) {
         continue;
       }
       const int64_t person_id =

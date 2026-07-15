@@ -68,11 +68,6 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
       ldbc::get_vertex_column<DateTime>(graph, person_label, "creationDate");
   auto place_id_col = ldbc::get_vertex_column<int64_t>(graph, place_label, "id");
 
-  if (!first_name_col || !last_name_col || !birthday_col || !location_ip_col ||
-      !browser_used_col || !gender_col || !creation_date_col) {
-    THROW_RUNTIME_ERROR("is1: failed to load required LDBC property columns");
-  }
-
   vid_t person_vid = StorageReadInterface::kInvalidVid;
   if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
                             person_vid)) {

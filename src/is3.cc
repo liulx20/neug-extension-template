@@ -77,13 +77,8 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
       person_label, person_label, knows_label);
   const auto in_view = graph.GetGenericIncomingGraphView(
       person_label, person_label, knows_label);
-  const bool has_edge_date = schema.edge_has_property(
+  const auto edge_accessor = graph.GetEdgeDataAccessor(
       person_label, person_label, knows_label, "creationDate");
-  EdgeDataAccessor edge_accessor;
-  if (has_edge_date) {
-    edge_accessor = graph.GetEdgeDataAccessor(person_label, person_label,
-                                              knows_label, "creationDate");
-  }
 
   std::vector<FriendInfo> friends;
   auto collect = [&](const CsrView& view, vid_t root) {
@@ -92,10 +87,8 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
       FriendInfo info;
       info.person_vid = *it;
       info.person_id = person_id_col->get_view(info.person_vid);
-      if (has_edge_date) {
-        info.friendship_creation_ms =
-            edge_accessor.get_typed_data<DateTime>(it).milli_second;
-      }
+      info.friendship_creation_ms =
+          edge_accessor.get_typed_data<DateTime>(it).milli_second;
       friends.push_back(info);
     }
   };

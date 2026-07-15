@@ -118,11 +118,8 @@ vid_t find_vertex_by_string_prop(const StorageReadInterface& graph,
                                  label_t label, const std::string& prop_name,
                                  const std::string& value) {
   auto col = get_vertex_column<std::string_view>(graph, label, prop_name);
-  if (!col) {
-    return StorageReadInterface::kInvalidVid;
-  }
-  for (auto it = graph.GetVertexSet(label).begin();
-       it != graph.GetVertexSet(label).end(); ++it) {
+  const auto& vertex_set = graph.GetVertexSet(label);
+  for (auto it = vertex_set.begin(); it != vertex_set.end(); ++it) {
     if (col->get_view(*it) == value) {
       return *it;
     }

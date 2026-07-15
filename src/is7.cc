@@ -72,9 +72,6 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
       graph, comment_label, "content");
   auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   auto comment_id_col = ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
-  if (!first_name_col || !last_name_col || !comment_content_col) {
-    THROW_RUNTIME_ERROR("is7: failed to load required LDBC property columns");
-  }
 
   vid_t message_vid = StorageReadInterface::kInvalidVid;
   bool is_post = false;
@@ -87,11 +84,10 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
       comment_label, person_label, has_creator_label);
   const bool has_edge_date = schema.edge_has_property(
       comment_label, person_label, has_creator_label, "creationDate");
-  EdgeDataAccessor edge_accessor;
-  if (has_edge_date) {
+  auto
     edge_accessor = graph.GetEdgeDataAccessor(
         comment_label, person_label, has_creator_label, "creationDate");
-  }
+  
 
   const label_t message_label = is_post ? post_label : comment_label;
   const auto message_has_creator_out = graph.GetGenericOutgoingGraphView(
@@ -122,7 +118,6 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
     info.author_vid = author_vid;
     info.comment_id = comment_id_col->get_view(comment_vid);
     info.author_id = person_id_col->get_view(author_vid);
-    if (has_edge_date) {
       for (auto author_it =
                comment_has_creator_out.get_edges(comment_vid).begin();
            author_it != comment_has_creator_out.get_edges(comment_vid).end();
@@ -133,13 +128,7 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
           break;
         }
       }
-    } else {
-      auto date_col = ldbc::get_vertex_column<DateTime>(graph, comment_label,
-                                                        "creationDate");
-      if (date_col) {
-        info.creation_date_ms = date_col->get_view(comment_vid).milli_second;
-      }
-    }
+   
     replies.push_back(info);
   }
 

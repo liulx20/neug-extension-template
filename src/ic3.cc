@@ -16,20 +16,15 @@
 
 #include "ic3.h"
 
-#include <glog/logging.h>
 #include <array>
 #include <queue>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "ldbc_common.h"
 #include "neug/compiler/common/types/types.h"
 #include "neug/execution/common/columns/value_columns.h"
 #include "neug/execution/common/context.h"
-#include "neug/execution/common/context_chunk.h"
-#include "neug/execution/common/types/value.h"
-#include "neug/storages/csr/csr_view.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
@@ -38,7 +33,6 @@ namespace ldbc_ic {
 namespace {
 
 constexpr size_t kTopN = 20;
-constexpr size_t kNumOutputColumns = 6;
 constexpr int64_t kMillisPerDay = 24L * 60 * 60 * 1000;
 
 struct PersonResult {
@@ -60,23 +54,6 @@ struct PersonResultComparer {
     return lhs.person_id < rhs.person_id;
   }
 };
-
-template <typename T>
-std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(
-    const StorageReadInterface& graph, label_t label,
-    const std::string& prop_name) {
-  auto col = graph.GetVertexPropColumn(label, prop_name);
-  return std::dynamic_pointer_cast<StorageReadInterface::vertex_column_t<T>>(
-      col);
-}
-
-vid_t get_single_out_neighbor(const CsrView& view, vid_t vertex) {
-  for (auto it = view.get_edges(vertex).begin();
-       it != view.get_edges(vertex).end(); ++it) {
-    return *it;
-  }
-  return StorageReadInterface::kInvalidVid;
-}
 
 std::unique_ptr<function::CallFuncInputBase> bind_ic3(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
@@ -117,20 +94,15 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
   const label_t is_located_in_label = schema.get_edge_label_id("ISLOCATEDIN");
   const label_t is_part_of_label = schema.get_edge_label_id("ISPARTOF");
 
-  auto first_name_col =
-      get_vertex_column<std::string_view>(graph, person_label, "firstName");
-  auto last_name_col =
-      get_vertex_column<std::string_view>(graph, person_label, "lastName");
-  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "firstName");
+  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+      graph, person_label, "lastName");
+  auto person_id_col =
+      ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
   auto place_name_col =
-      get_vertex_column<std::string_view>(graph, place_label, "name");
-  auto post_creation_date_col =
-      get_vertex_column<DateTime>(graph, post_label, "creationDate");
-  auto comment_creation_date_col =
-      get_vertex_column<DateTime>(graph, comment_label, "creationDate");
-
-  if (!first_name_col || !last_name_col || !place_name_col ||
-      !post_creation_date_col || !comment_creation_date_col) {
+      ldbc::get_vertex_column<std::string_view>(graph, place_label, "name");
+  if (!first_name_col || !last_name_col || !place_name_col || !person_id_col) {
     THROW_RUNTIME_ERROR("ic3: failed to load required LDBC property columns");
   }
 
@@ -158,7 +130,6 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
     THROW_INVALID_ARGUMENT_EXCEPTION("ic3: country not found");
   }
 
-  const auto person_set = graph.GetVertexSet(person_label);
   std::vector<uint8_t> city_in_country_x_or_y(place_set.size(), 0);
 
   const auto city_in_country = graph.GetGenericIncomingGraphView(
@@ -185,14 +156,14 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
   ldbc::foreach_knows_1d_2d_neighbor(
       graph, person_label, knows_label, root, [&](vid_t friend_vid) {
         const vid_t city_vid =
-            get_single_out_neighbor(person_located_in, friend_vid);
+            ldbc::get_single_out_neighbor(person_located_in, friend_vid);
         if (city_in_country_x_or_y[city_vid]) {
           return;
         }
         friends.push_back(friend_vid);
       });
-  const int64_t end_date_ms = start_date_ms + duration_days * kMillisPerDay;
 
+  const int64_t end_date_ms = start_date_ms + duration_days * kMillisPerDay;
   const auto post_has_creator_in = ldbc::get_typed_incoming_view(
       graph, person_label, post_label, has_creator_label);
   const auto comment_has_creator_in = ldbc::get_typed_incoming_view(
@@ -213,7 +184,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
               has_creator_in, friend_vid, start_date_ms, end_date_ms,
               [&](vid_t message_vid, const DateTime& /*creation_date*/) {
                 const vid_t locate =
-                    get_single_out_neighbor(located_in_view, message_vid);
+                    ldbc::get_single_out_neighbor(located_in_view, message_vid);
                 if (locate == country_x) {
                   ++x_count;
                 } else if (locate == country_y) {
@@ -228,33 +199,26 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
     if (x_count == 0 || y_count == 0) {
       continue;
     }
+
     PersonResult row;
     row.person_vid = friend_vid;
     row.count_x = x_count;
     row.count_y = y_count;
     row.total = x_count + y_count;
+    row.person_id = person_id_col->get_view(friend_vid);
     if (pq.size() < kTopN) {
-      row.person_id =
-          person_id_col->get_view(friend_vid);
-
       pq.push(row);
       continue;
     }
     const auto& worst = pq.top();
     if (row.total > worst.total) {
       pq.pop();
-      row.person_id =
-          person_id_col->get_view(friend_vid);
       pq.push(row);
       continue;
     }
-    if (row.total == worst.total) {
-      row.person_id =
-          person_id_col->get_view(friend_vid);
-      if (row.person_id < worst.person_id) {
-        pq.pop();
-        pq.push(row);
-      }
+    if (row.total == worst.total && row.person_id < worst.person_id) {
+      pq.pop();
+      pq.push(row);
     }
   }
 
@@ -291,23 +255,11 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
     total_builder.push_back_opt(static_cast<int64_t>(row.total));
   }
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = person_id_builder.finish();
-  output_columns[1] = first_name_builder.finish();
-  output_columns[2] = last_name_builder.finish();
-  output_columns[3] = country_x_builder.finish();
-  output_columns[4] = country_y_builder.finish();
-  output_columns[5] = total_builder.finish();
-
-  execution::Context ctx;
-  execution::ContextChunk out_chunk;
-  ctx.tag_ids = ic3_input.output_aliases;
-  for (size_t i = 0; i < ic3_input.output_aliases.size(); ++i) {
-    out_chunk.set(ic3_input.output_aliases[i], output_columns[i]);
-  }
-  ctx.append_chunk(std::move(out_chunk));
-  return ctx;
+  return ldbc::make_output_context(
+      ic3_input.output_aliases,
+      {person_id_builder.finish(), first_name_builder.finish(),
+       last_name_builder.finish(), country_x_builder.finish(),
+       country_y_builder.finish(), total_builder.finish()});
 }
 
 }  // namespace

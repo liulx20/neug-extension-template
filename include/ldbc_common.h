@@ -154,8 +154,9 @@ inline void foreach_knows_1d_2d_neighbor(const StorageReadInterface& graph,
   const auto in_view = graph.GetGenericIncomingGraphView(
       person_label, person_label, knows_label);
 
-  std::vector<bool> visited(graph.GetVertexSet(person_label).size(), false);
-  visited[root] = true;
+  //std::vector<bool> visited(graph.GetVertexSet(person_label).size(), false);
+  phmap::flat_hash_set<vid_t> visited;
+  visited.insert(root);
   std::vector<vid_t> neighbors;
   const auto root_in = in_view.get_edges(root);
   for (auto it = root_in.begin(); it != root_in.end(); ++it) {
@@ -167,21 +168,21 @@ inline void foreach_knows_1d_2d_neighbor(const StorageReadInterface& graph,
   }
 
   for (vid_t neighbor : neighbors) {
-    if (!visited[neighbor]) {
-      visited[neighbor] = true;
+    if (!visited.contains(neighbor)) {
+      visited.insert(neighbor);
       std::forward<Func>(func)(neighbor);
     }
     const auto neighbor_in = in_view.get_edges(neighbor);
     for (auto it = neighbor_in.begin(); it != neighbor_in.end(); ++it) {
-      if (!visited[*it]) {
-        visited[*it] = true;
+      if (!visited.contains(*it)) {
+        visited.insert(*it);
         std::forward<Func>(func)(*it);
       }
     }
     const auto neighbor_out = out_view.get_edges(neighbor);
     for (auto it = neighbor_out.begin(); it != neighbor_out.end(); ++it) {
-      if (!visited[*it]) {
-        visited[*it] = true;
+      if (!visited.contains(*it)) {
+        visited.insert(*it);
         std::forward<Func>(func)(*it);
       }
     }

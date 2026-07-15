@@ -200,9 +200,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
   for (const auto& pair : post_count) {
     const vid_t forum_vid = pair.first;
     const int count = pair.second;
-    if (forum_vid < forum_num) {
-      accessed_forum_set[forum_vid] = false;
-    }
+    accessed_forum_set[forum_vid] = false;
     if (que.size() < kTopN) {
       que.emplace(
           forum_vid, count,
@@ -227,7 +225,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
 
   if (que.size() < kTopN) {
     for (vid_t forum_vid : forum_list) {
-      if (forum_vid >= forum_num || !accessed_forum_set[forum_vid]) {
+      if (!accessed_forum_set[forum_vid]) {
         continue;
       }
       accessed_forum_set[forum_vid] = false;
