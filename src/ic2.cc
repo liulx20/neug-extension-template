@@ -86,7 +86,7 @@ void foreach_knows_neighbor(const StorageReadInterface& graph,
 }
 
 void scan_messages_for_friend(
-    const ldbc::DateTimeIncomingView& has_creator_in,
+    const ldbc::TypedView& has_creator_in,
     const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
     bool is_post, vid_t friend_vid, int64_t& min_date_ms, int64_t max_date_ms,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,

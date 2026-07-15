@@ -227,21 +227,19 @@ vid_t find_vertex_by_string_prop(const StorageReadInterface& graph,
                                  label_t label, const std::string& prop_name,
                                  const std::string& value);
 
-using DateTimeIncomingView =
-    TypedCsrView<DateTime, CsrViewType::kMultipleMutable>;
+using TypedView = TypedCsrView<DateTime, CsrViewType::kMultipleMutable>;
 
-inline DateTimeIncomingView get_typed_incoming_view(
-    const StorageReadInterface& graph, label_t dst_label, label_t src_label,
-    label_t edge_label) {
+inline TypedView get_typed_incoming_view(const StorageReadInterface& graph,
+                                         label_t dst_label, label_t src_label,
+                                         label_t edge_label) {
   const auto view = graph.GetGenericIncomingGraphView(dst_label, src_label,
                                                       edge_label);
   return view.get_typed_view<DateTime, CsrViewType::kMultipleMutable>();
 }
 
 template <typename Func>
-inline void foreach_incoming_nbr_lt(const DateTimeIncomingView& view,
-                                    vid_t dst_vid, const DateTime& threshold,
-                                    Func&& func) {
+inline void foreach_incoming_nbr_lt(const TypedView& view, vid_t dst_vid,
+                                    const DateTime& threshold, Func&& func) {
   view.foreach_nbr_lt(dst_vid, threshold,
                       [&](vid_t nbr, const DateTime& edge_data) {
                         std::forward<Func>(func)(nbr, edge_data);
@@ -249,9 +247,8 @@ inline void foreach_incoming_nbr_lt(const DateTimeIncomingView& view,
 }
 
 template <typename Func>
-inline void foreach_incoming_nbr_gt(const DateTimeIncomingView& view,
-                                    vid_t dst_vid, const DateTime& threshold,
-                                    Func&& func) {
+inline void foreach_incoming_nbr_gt(const TypedView& view, vid_t dst_vid,
+                                    const DateTime& threshold, Func&& func) {
   view.foreach_nbr_gt(dst_vid, threshold,
                       [&](vid_t nbr, const DateTime& edge_data) {
                         std::forward<Func>(func)(nbr, edge_data);
@@ -261,8 +258,8 @@ inline void foreach_incoming_nbr_gt(const DateTimeIncomingView& view,
 // Flex foreach_edges_between(v, minDate, maxDate) on incoming DateTime CSR:
 // keep edges with minDate <= creationDate <= maxDate (inclusive).
 template <typename Func>
-inline void foreach_incoming_nbr_between(const DateTimeIncomingView& view,
-                                         vid_t dst_vid, int64_t min_date_ms,
+inline void foreach_incoming_nbr_between(const TypedView& view, vid_t dst_vid,
+                                         int64_t min_date_ms,
                                          int64_t max_date_ms, Func&& func) {
   foreach_incoming_nbr_lt(
       view, dst_vid, DateTime(max_date_ms + 1),
@@ -277,7 +274,7 @@ inline void foreach_incoming_nbr_between(const DateTimeIncomingView& view,
 // Flex foreach_edges_between with an exclusive upper bound: [minDate, maxDate).
 template <typename Func>
 inline void foreach_incoming_nbr_between_half_open(
-    const DateTimeIncomingView& view, vid_t dst_vid, int64_t min_date_ms,
+    const TypedView& view, vid_t dst_vid, int64_t min_date_ms,
     int64_t max_date_ms, Func&& func) {
   foreach_incoming_nbr_lt(
       view, dst_vid, DateTime(max_date_ms),

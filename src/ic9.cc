@@ -53,7 +53,7 @@ struct MessageInfoComparer {
 };
 
 void scan_messages(
-    const ldbc::DateTimeIncomingView& has_creator_in,
+    const ldbc::TypedView& has_creator_in,
     const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
     bool is_post, vid_t friend_vid, int64_t max_date_ms,
     const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,

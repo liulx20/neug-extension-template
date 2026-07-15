@@ -73,7 +73,7 @@ void consider_message(std::priority_queue<MessageInfo, std::vector<MessageInfo>,
 
 void scan_person_messages(
     const StorageReadInterface& graph, const Schema& schema,
-    const ldbc::DateTimeIncomingView& has_creator_in, label_t person_label,
+    const ldbc::TypedView& has_creator_in, label_t person_label,
     label_t message_label, bool is_post, vid_t person_vid,
     const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,

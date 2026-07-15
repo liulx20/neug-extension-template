@@ -134,8 +134,7 @@ execution::Context exec_ic6(const function::CallFuncInputBase& input,
     const vid_t post_vid = *it;
     const vid_t creator_vid =
         ldbc::get_single_out_neighbor(post_has_creator_out, post_vid);
-    if (creator_vid == StorageReadInterface::kInvalidVid ||
-        creator_vid >= friends.size() || !friends[creator_vid]) {
+    if (creator_vid == StorageReadInterface::kInvalidVid || !friends[creator_vid]) {
       continue;
     }
     const auto tags = post_has_tag_out.get_edges(post_vid);

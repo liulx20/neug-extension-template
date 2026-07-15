@@ -179,7 +179,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
 
     auto scan_friend_messages =
         [&](const CsrView& located_in_view,
-            const ldbc::DateTimeIncomingView& has_creator_in) {
+            const ldbc::TypedView& has_creator_in) {
           ldbc::foreach_incoming_nbr_between_half_open(
               has_creator_in, friend_vid, start_date_ms, end_date_ms,
               [&](vid_t message_vid, const DateTime& /*creation_date*/) {
