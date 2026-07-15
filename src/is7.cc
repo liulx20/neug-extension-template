@@ -200,14 +200,13 @@ function::function_set IS7Function::getFunctionSet() {
       IS7Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"commentId", common::DataTypeId::kInt64},
-          {"commentContent", common::DataTypeId::kVarchar},
-          {"commentCreationDate", common::DataTypeId::kTimestampMs},
-          {"replyAuthorId", common::DataTypeId::kInt64},
-          {"replyAuthorFirstName", common::DataTypeId::kVarchar},
-          {"replyAuthorLastName", common::DataTypeId::kVarchar},
-          {"isReplyAuthorKnowsOriginalMessageAuthor",
-           common::DataTypeId::kBoolean}});
+          {"commentId", common::DataType(common::DataTypeId::kInt64)},
+          {"commentContent", common::DataType(common::DataTypeId::kVarchar)},
+          {"commentCreationDate", common::DataType(common::DataTypeId::kTimestampMs)},
+          {"replyAuthorId", common::DataType(common::DataTypeId::kInt64)},
+          {"replyAuthorFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"replyAuthorLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"isReplyAuthorKnowsOriginalMessageAuthor", common::DataType(common::DataTypeId::kBoolean)}});
   function->bindFunc = bind_is7;
   function->execFunc = exec_is7;
   function::function_set function_set;

@@ -267,12 +267,12 @@ function::function_set IC2Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"messageId", common::DataTypeId::kInt64},
-          {"messageContent", common::DataTypeId::kVarchar},
-          {"messageCreationDate", common::DataTypeId::kTimestampMs}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"messageId", common::DataType(common::DataTypeId::kInt64)},
+          {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
+          {"messageCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
 
   function->bindFunc = bind_ic2;
   function->execFunc = exec_ic2;

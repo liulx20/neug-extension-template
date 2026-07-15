@@ -199,12 +199,12 @@ function::function_set IC9Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"messageId", common::DataTypeId::kInt64},
-          {"messageContent", common::DataTypeId::kVarchar},
-          {"messageCreationDate", common::DataTypeId::kTimestampMs}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"messageId", common::DataType(common::DataTypeId::kInt64)},
+          {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
+          {"messageCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
   fn->bindFunc = bind_ic9;
   fn->execFunc = exec_ic9;
   function::function_set set;

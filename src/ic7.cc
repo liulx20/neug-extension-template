@@ -306,14 +306,14 @@ function::function_set IC7Function::getFunctionSet() {
       IC7Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"likeCreationDate", common::DataTypeId::kTimestampMs},
-          {"messageId", common::DataTypeId::kInt64},
-          {"messageContent", common::DataTypeId::kVarchar},
-          {"minutesLatency", common::DataTypeId::kInt32},
-          {"isNew", common::DataTypeId::kBoolean}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"likeCreationDate", common::DataType(common::DataTypeId::kTimestampMs)},
+          {"messageId", common::DataType(common::DataTypeId::kInt64)},
+          {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
+          {"minutesLatency", common::DataType(common::DataTypeId::kInt32)},
+          {"isNew", common::DataType(common::DataTypeId::kBoolean)}});
   function->bindFunc = bind_ic7;
   function->execFunc = exec_ic7;
   function::function_set function_set;

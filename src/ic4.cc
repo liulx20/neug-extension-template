@@ -190,8 +190,8 @@ function::function_set IC4Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
-      function::call_output_columns{{"tagName", common::DataTypeId::kVarchar},
-                                    {"postCount", common::DataTypeId::kInt32}});
+      function::call_output_columns{{"tagName", common::DataType(common::DataTypeId::kVarchar)},
+                                    {"postCount", common::DataType(common::DataTypeId::kInt32)}});
   fn->bindFunc = bind_ic4;
   fn->execFunc = exec_ic4;
   function::function_set set;

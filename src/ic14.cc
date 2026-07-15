@@ -566,8 +566,8 @@ function::function_set IC14Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
       function::call_output_columns{
-          function::call_output("personIdsInPath", person_ids_in_path_type),
-          function::call_output("pathWeight", common::DataTypeId::kDouble)});
+          {"personIdsInPath", person_ids_in_path_type},
+          {"pathWeight", common::DataType(common::DataTypeId::kDouble)}});
   fn->bindFunc = bind_ic14;
   fn->execFunc = exec_ic14;
   function::function_set set;

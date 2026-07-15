@@ -141,10 +141,10 @@ function::function_set IS3Function::getFunctionSet() {
       IS3Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"firstName", common::DataTypeId::kVarchar},
-          {"lastName", common::DataTypeId::kVarchar},
-          {"friendshipCreationDate", common::DataTypeId::kTimestampMs}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"firstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"lastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendshipCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
   function->bindFunc = bind_is3;
   function->execFunc = exec_is3;
   function::function_set function_set;

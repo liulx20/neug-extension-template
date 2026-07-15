@@ -289,8 +289,8 @@ function::function_set IC5Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"forumTitle", common::DataTypeId::kVarchar},
-          {"postCount", common::DataTypeId::kInt32}});
+          {"forumTitle", common::DataType(common::DataTypeId::kVarchar)},
+          {"postCount", common::DataType(common::DataTypeId::kInt32)}});
   function->bindFunc = bind_ic5;
   function->execFunc = exec_ic5;
   function::function_set function_set;

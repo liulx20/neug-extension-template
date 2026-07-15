@@ -453,23 +453,19 @@ function::function_set IC1Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kVarchar},
       function::call_output_columns{
-          function::call_output("friendId", common::DataTypeId::kInt64),
-          function::call_output("distanceFromPerson",
-                                common::DataTypeId::kInt32),
-          function::call_output("friendLastName", common::DataTypeId::kVarchar),
-          function::call_output("friendBirthday", common::DataTypeId::kDate),
-          function::call_output("friendCreationDate",
-                                common::DataTypeId::kTimestampMs),
-          function::call_output("friendGender", common::DataTypeId::kVarchar),
-          function::call_output("friendBrowserUsed",
-                                common::DataTypeId::kVarchar),
-          function::call_output("friendLocationIp",
-                                common::DataTypeId::kVarchar),
-          function::call_output("friendCityName", common::DataTypeId::kVarchar),
-          function::call_output("friendEmail", common::DataTypeId::kVarchar),
-          function::call_output("friendLanguage", common::DataTypeId::kVarchar),
-          function::call_output("friendUniversities", kOrgPlaceListType),
-          function::call_output("friendCompanies", kOrgPlaceListType)});
+          {"friendId", common::DataType(common::DataTypeId::kInt64)},
+          {"distanceFromPerson", common::DataType(common::DataTypeId::kInt32)},
+          {"friendLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendBirthday", common::DataType(common::DataTypeId::kDate)},
+          {"friendCreationDate", common::DataType(common::DataTypeId::kTimestampMs)},
+          {"friendGender", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendBrowserUsed", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendLocationIp", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendCityName", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendEmail", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendLanguage", common::DataType(common::DataTypeId::kVarchar)},
+          {"friendUniversities", kOrgPlaceListType},
+          {"friendCompanies", kOrgPlaceListType}});
   fn->bindFunc = bind_ic1;
   fn->execFunc = exec_ic1;
   function::function_set set;

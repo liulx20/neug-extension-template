@@ -237,12 +237,12 @@ function::function_set IC8Function::getFunctionSet() {
       IC8Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"commentCreationDate", common::DataTypeId::kTimestampMs},
-          {"commentId", common::DataTypeId::kInt64},
-          {"commentContent", common::DataTypeId::kVarchar}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"commentCreationDate", common::DataType(common::DataTypeId::kTimestampMs)},
+          {"commentId", common::DataType(common::DataTypeId::kInt64)},
+          {"commentContent", common::DataType(common::DataTypeId::kVarchar)}});
   function->bindFunc = bind_ic8;
   function->execFunc = exec_ic8;
   function::function_set function_set;

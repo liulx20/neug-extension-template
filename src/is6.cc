@@ -134,11 +134,11 @@ function::function_set IS6Function::getFunctionSet() {
       IS6Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"forumId", common::DataTypeId::kInt64},
-          {"forumTitle", common::DataTypeId::kVarchar},
-          {"moderatorId", common::DataTypeId::kInt64},
-          {"moderatorFirstName", common::DataTypeId::kVarchar},
-          {"moderatorLastName", common::DataTypeId::kVarchar}});
+          {"forumId", common::DataType(common::DataTypeId::kInt64)},
+          {"forumTitle", common::DataType(common::DataTypeId::kVarchar)},
+          {"moderatorId", common::DataType(common::DataTypeId::kInt64)},
+          {"moderatorFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"moderatorLastName", common::DataType(common::DataTypeId::kVarchar)}});
   function->bindFunc = bind_is6;
   function->execFunc = exec_is6;
   function::function_set function_set;

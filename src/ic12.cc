@@ -265,12 +265,11 @@ function::function_set IC12Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kVarchar},
       function::call_output_columns{
-          function::call_output("personId", common::DataTypeId::kInt64),
-          function::call_output("personFirstName",
-                                common::DataTypeId::kVarchar),
-          function::call_output("personLastName", common::DataTypeId::kVarchar),
-          function::call_output("tagNames", tag_names_list_type),
-          function::call_output("replyCount", common::DataTypeId::kInt32)});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"tagNames", tag_names_list_type},
+          {"replyCount", common::DataType(common::DataTypeId::kInt32)}});
   fn->bindFunc = bind_ic12;
   fn->execFunc = exec_ic12;
   function::function_set set;

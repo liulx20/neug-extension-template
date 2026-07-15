@@ -187,8 +187,8 @@ function::function_set IC6Function::getFunctionSet() {
       IC6Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kVarchar},
-      function::call_output_columns{{"tagName", common::DataTypeId::kVarchar},
-                                    {"postCount", common::DataTypeId::kInt32}});
+      function::call_output_columns{{"tagName", common::DataType(common::DataTypeId::kVarchar)},
+                                    {"postCount", common::DataType(common::DataTypeId::kInt32)}});
   function->bindFunc = bind_ic6;
   function->execFunc = exec_ic6;
   function::function_set function_set;

@@ -87,8 +87,8 @@ function::function_set IS4Function::getFunctionSet() {
       IS4Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"messageContent", common::DataTypeId::kVarchar},
-          {"messageCreationDate", common::DataTypeId::kTimestampMs}});
+          {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
+          {"messageCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
   function->bindFunc = bind_is4;
   function->execFunc = exec_is4;
   function::function_set function_set;

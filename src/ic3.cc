@@ -272,12 +272,12 @@ function::function_set IC3Function::getFunctionSet() {
           common::DataTypeId::kVarchar, common::DataTypeId::kInt64,
           common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"countryXCount", common::DataTypeId::kInt64},
-          {"countryYCount", common::DataTypeId::kInt64},
-          {"totalCount", common::DataTypeId::kInt64}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"countryXCount", common::DataType(common::DataTypeId::kInt64)},
+          {"countryYCount", common::DataType(common::DataTypeId::kInt64)},
+          {"totalCount", common::DataType(common::DataTypeId::kInt64)}});
 
   function->bindFunc = bind_ic3;
   function->execFunc = exec_ic3;

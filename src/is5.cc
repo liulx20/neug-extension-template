@@ -105,9 +105,9 @@ function::function_set IS5Function::getFunctionSet() {
       IS5Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"firstName", common::DataTypeId::kVarchar},
-          {"lastName", common::DataTypeId::kVarchar}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"firstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"lastName", common::DataType(common::DataTypeId::kVarchar)}});
   function->bindFunc = bind_is5;
   function->execFunc = exec_is5;
   function::function_set function_set;

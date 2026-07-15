@@ -130,14 +130,14 @@ function::function_set IS1Function::getFunctionSet() {
       IS1Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"firstName", common::DataTypeId::kVarchar},
-          {"lastName", common::DataTypeId::kVarchar},
-          {"birthday", common::DataTypeId::kDate},
-          {"locationIp", common::DataTypeId::kVarchar},
-          {"browserUsed", common::DataTypeId::kVarchar},
-          {"cityId", common::DataTypeId::kInt64},
-          {"gender", common::DataTypeId::kVarchar},
-          {"creationDate", common::DataTypeId::kTimestampMs}});
+          {"firstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"lastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"birthday", common::DataType(common::DataTypeId::kDate)},
+          {"locationIp", common::DataType(common::DataTypeId::kVarchar)},
+          {"browserUsed", common::DataType(common::DataTypeId::kVarchar)},
+          {"cityId", common::DataType(common::DataTypeId::kInt64)},
+          {"gender", common::DataType(common::DataTypeId::kVarchar)},
+          {"creationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
   function->bindFunc = bind_is1;
   function->execFunc = exec_is1;
   function::function_set function_set;

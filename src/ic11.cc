@@ -201,11 +201,11 @@ function::function_set IC11Function::getFunctionSet() {
                                       common::DataTypeId::kVarchar,
                                       common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"organizationName", common::DataTypeId::kVarchar},
-          {"organizationWorkFromYear", common::DataTypeId::kInt32}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"organizationName", common::DataType(common::DataTypeId::kVarchar)},
+          {"organizationWorkFromYear", common::DataType(common::DataTypeId::kInt32)}});
   fn->bindFunc = bind_ic11;
   fn->execFunc = exec_ic11;
   function::function_set set;

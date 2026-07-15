@@ -259,12 +259,12 @@ function::function_set IC10Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"personId", common::DataTypeId::kInt64},
-          {"personFirstName", common::DataTypeId::kVarchar},
-          {"personLastName", common::DataTypeId::kVarchar},
-          {"score", common::DataTypeId::kInt32},
-          {"personGender", common::DataTypeId::kVarchar},
-          {"cityName", common::DataTypeId::kVarchar}});
+          {"personId", common::DataType(common::DataTypeId::kInt64)},
+          {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
+          {"score", common::DataType(common::DataTypeId::kInt32)},
+          {"personGender", common::DataType(common::DataTypeId::kVarchar)},
+          {"cityName", common::DataType(common::DataTypeId::kVarchar)}});
   fn->bindFunc = bind_ic10;
   fn->execFunc = exec_ic10;
   function::function_set set;

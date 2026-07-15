@@ -252,13 +252,13 @@ function::function_set IS2Function::getFunctionSet() {
       IS2Function::name,
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"messageId", common::DataTypeId::kInt64},
-          {"messageContent", common::DataTypeId::kVarchar},
-          {"messageCreationDate", common::DataTypeId::kTimestampMs},
-          {"originalPostId", common::DataTypeId::kInt64},
-          {"originalPostAuthorId", common::DataTypeId::kInt64},
-          {"originalPostAuthorFirstName", common::DataTypeId::kVarchar},
-          {"originalPostAuthorLastName", common::DataTypeId::kVarchar}});
+          {"messageId", common::DataType(common::DataTypeId::kInt64)},
+          {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
+          {"messageCreationDate", common::DataType(common::DataTypeId::kTimestampMs)},
+          {"originalPostId", common::DataType(common::DataTypeId::kInt64)},
+          {"originalPostAuthorId", common::DataType(common::DataTypeId::kInt64)},
+          {"originalPostAuthorFirstName", common::DataType(common::DataTypeId::kVarchar)},
+          {"originalPostAuthorLastName", common::DataType(common::DataTypeId::kVarchar)}});
   function->bindFunc = bind_is2;
   function->execFunc = exec_is2;
   function::function_set function_set;

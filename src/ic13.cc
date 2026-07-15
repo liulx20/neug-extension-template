@@ -167,7 +167,7 @@ function::function_set IC13Function::getFunctionSet() {
       std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
                                       common::DataTypeId::kInt64},
       function::call_output_columns{
-          {"shortestPathLength", common::DataTypeId::kInt32}});
+          {"shortestPathLength", common::DataType(common::DataTypeId::kInt32)}});
   fn->bindFunc = bind_ic13;
   fn->execFunc = exec_ic13;
   function::function_set set;
