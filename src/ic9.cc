@@ -16,21 +16,20 @@
 
 #include "ic9.h"
 
-#include <array>
 #include <queue>
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kTopN = 20;
-constexpr size_t kNumOutputColumns = 6;
+class IC9 {
+public:
+static constexpr size_t kTopN = 20;
 
 struct MessageInfo {
   vid_t message_vid = 0;
@@ -52,7 +51,7 @@ struct MessageInfoComparer {
   }
 };
 
-void scan_messages(
+static void scan_messages(
     const ldbc::TypedView& has_creator_in,
     const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
     bool is_post, vid_t friend_vid, int64_t max_date_ms,
@@ -90,7 +89,7 @@ void scan_messages(
       });
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic9(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -104,12 +103,11 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic9(
   return input;
 }
 
-execution::Context exec_ic9(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC9FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const int64_t max_date_ms = params.at("maxDate").GetValue<int64_t>();
+  const int64_t person_id = args.person_id;
+  const int64_t max_date_ms = args.max_date_ms;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -135,7 +133,7 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -163,12 +161,12 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
     pq.pop();
   }
 
-  execution::ValueColumnBuilder<int64_t> person_id_builder;
-  execution::ValueColumnBuilder<std::string> first_name_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ValueColumnBuilder<int64_t> message_id_builder;
-  execution::ValueColumnBuilder<std::string> message_content_builder;
-  execution::ValueColumnBuilder<DateTime> message_date_builder;
+  ValueColumnBuilder<int64_t> person_id_builder;
+  ValueColumnBuilder<std::string> first_name_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ValueColumnBuilder<int64_t> message_id_builder;
+  ValueColumnBuilder<std::string> message_content_builder;
+  ValueColumnBuilder<DateTime> message_date_builder;
 
   for (size_t i = results.size(); i > 0; --i) {
     const auto& row = results[i - 1];
@@ -184,20 +182,26 @@ execution::Context exec_ic9(const function::CallFuncInputBase& input,
     message_date_builder.push_back_opt(DateTime(row.creation_date_ms));
   }
 
-  return ldbc::make_output_context(
-      args.output_aliases,
-      {person_id_builder.finish(), first_name_builder.finish(),
-       last_name_builder.finish(), message_id_builder.finish(),
-       message_content_builder.finish(), message_date_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, person_id_builder.finish());
+  chunk.set(1, first_name_builder.finish());
+  chunk.set(2, last_name_builder.finish());
+  chunk.set(3, message_id_builder.finish());
+  chunk.set(4, message_content_builder.finish());
+  chunk.set(5, message_date_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC9Function::getFunctionSet() {
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC9Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"personId", common::DataType(common::DataTypeId::kInt64)},
           {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
@@ -205,8 +209,8 @@ function::function_set IC9Function::getFunctionSet() {
           {"messageId", common::DataType(common::DataTypeId::kInt64)},
           {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
           {"messageCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
-  fn->bindFunc = bind_ic9;
-  fn->execFunc = exec_ic9;
+  fn->bindFunc = IC9::bind;
+  fn->execFunc = IC9::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

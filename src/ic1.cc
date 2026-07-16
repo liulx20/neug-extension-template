@@ -21,47 +21,24 @@
 #include <vector>
 
 #include "ldbc_common.h"
+#include "neug/execution/common/context_chunk.h"
 #include "neug/common/extra_type_info.h"
 #include "neug/compiler/binder/binder.h"
 #include "neug/compiler/function/table/bind_data.h"
 #include "neug/compiler/function/table/bind_input.h"
 #include "neug/compiler/function/table/table_function.h"
-#include "neug/execution/common/columns/list_columns.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/common/columns/list_columns.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
+
+
 namespace {
 
-constexpr size_t kTopN = 20;
-
-struct PersonResult {
-  uint8_t distance = 0;
-  std::string_view last_name;
-  int64_t id = 0;
-  vid_t vid = 0;
-};
-
-struct PersonResultComparer {
-  bool operator()(const PersonResult& lhs, const PersonResult& rhs) const {
-    if (lhs.distance < rhs.distance) {
-      return true;
-    }
-    if (lhs.distance > rhs.distance) {
-      return false;
-    }
-    if (lhs.last_name < rhs.last_name) {
-      return true;
-    }
-    if (lhs.last_name > rhs.last_name) {
-      return false;
-    }
-    return lhs.id < rhs.id;
-  }
-};
-
+// Element type for universities/companies: STRUCT(orgName, orgYear, orgPlaceName)
 const DataType kOrgPlaceTupleType = DataType::Struct(
     {DataType(DataTypeId::kVarchar), DataType(DataTypeId::kInt32),
      DataType(DataTypeId::kVarchar)});
@@ -71,7 +48,37 @@ const common::DataType kOrgPlaceTupleCatalogType =
                               common::DataType(common::DataTypeId::kInt32),
                               common::DataType(common::DataTypeId::kVarchar)});
 
-void try_enqueue_friend(
+}  // namespace
+
+class IC1 {
+ public:
+  static constexpr size_t kTopN = 20;
+  struct PersonResult {
+    uint8_t distance = 0;
+    std::string_view last_name;
+    int64_t id = 0;
+    vid_t vid = 0;
+  };
+
+  struct PersonResultComparer {
+    bool operator()(const PersonResult& lhs, const PersonResult& rhs) const {
+      if (lhs.distance < rhs.distance) {
+        return true;
+      }
+      if (lhs.distance > rhs.distance) {
+        return false;
+      }
+      if (lhs.last_name < rhs.last_name) {
+        return true;
+      }
+      if (lhs.last_name > rhs.last_name) {
+        return false;
+      }
+      return lhs.id < rhs.id;
+    }
+  };
+
+  static void try_enqueue_friend(
     std::priority_queue<PersonResult, std::vector<PersonResult>,
                         PersonResultComparer>* pq,
     int dist, std::string_view last_name, int64_t id, vid_t vid) {
@@ -92,7 +99,7 @@ void try_enqueue_friend(
   }
 }
 
-void collect_friends(
+static void collect_friends(
     const StorageReadInterface& graph, label_t person_label,
     label_t knows_label, vid_t root, std::string_view first_name,
     const StorageReadInterface::vertex_column_t<std::string_view>&
@@ -221,7 +228,7 @@ void collect_friends(
   }
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic1(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -235,12 +242,11 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic1(
   return input;
 }
 
-execution::Context exec_ic1(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC1FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const std::string first_name = params.at("firstName").GetValue<std::string>();
+  const int64_t person_id = args.person_id;
+  const std::string first_name = args.first_name;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -278,7 +284,7 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
 
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -314,19 +320,19 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
                                                    work_at_label, "workFrom");
   }
 
-  execution::ValueColumnBuilder<int64_t> friend_id_builder;
-  execution::ValueColumnBuilder<int32_t> distance_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ValueColumnBuilder<Date> birthday_builder;
-  execution::ValueColumnBuilder<DateTime> creation_date_builder;
-  execution::ValueColumnBuilder<std::string> gender_builder;
-  execution::ValueColumnBuilder<std::string> browser_used_builder;
-  execution::ValueColumnBuilder<std::string> location_ip_builder;
-  execution::ValueColumnBuilder<std::string> city_name_builder;
-  execution::ValueColumnBuilder<std::string> email_builder;
-  execution::ValueColumnBuilder<std::string> language_builder;
-  execution::ListColumnBuilder universities_builder(kOrgPlaceTupleType);
-  execution::ListColumnBuilder companies_builder(kOrgPlaceTupleType);
+  ValueColumnBuilder<int64_t> friend_id_builder;
+  ValueColumnBuilder<int32_t> distance_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ValueColumnBuilder<Date> birthday_builder;
+  ValueColumnBuilder<DateTime> creation_date_builder;
+  ValueColumnBuilder<std::string> gender_builder;
+  ValueColumnBuilder<std::string> browser_used_builder;
+  ValueColumnBuilder<std::string> location_ip_builder;
+  ValueColumnBuilder<std::string> city_name_builder;
+  ValueColumnBuilder<std::string> email_builder;
+  ValueColumnBuilder<std::string> language_builder;
+  ListColumnBuilder universities_builder(kOrgPlaceTupleType);
+  ListColumnBuilder companies_builder(kOrgPlaceTupleType);
 
   for (size_t i = results.size(); i > 0; --i) {
     const auto& row = results[i - 1];
@@ -376,7 +382,7 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
       language_builder.push_back_null();
     }
 
-    std::vector<execution::Value> university_values;
+    std::vector<Value> university_values;
     const auto study_edges = person_study_at_out.get_edges(v);
     for (auto it = study_edges.begin(); it != study_edges.end(); ++it) {
       const vid_t org_vid = *it;
@@ -390,18 +396,18 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
       if (place_vid != StorageReadInterface::kInvalidVid) {
         city_name = std::string(place_name_col->get_view(place_vid));
       }
-      std::vector<execution::Value> tuple_vals;
-      tuple_vals.emplace_back(execution::Value::STRING(
+      std::vector<Value> tuple_vals;
+      tuple_vals.emplace_back(Value::STRING(
           std::string(org_name_col->get_view(org_vid))));
-      tuple_vals.emplace_back(execution::Value::INT32(class_year));
-      tuple_vals.emplace_back(execution::Value::STRING(std::move(city_name)));
+      tuple_vals.emplace_back(Value::INT32(class_year));
+      tuple_vals.emplace_back(Value::STRING(std::move(city_name)));
       university_values.emplace_back(
-          execution::Value::STRUCT(kOrgPlaceTupleType, std::move(tuple_vals)));
+          Value::STRUCT(kOrgPlaceTupleType, std::move(tuple_vals)));
     }
-    universities_builder.push_back_elem(execution::Value::LIST(
+    universities_builder.push_back_elem(Value::LIST(
         kOrgPlaceTupleType, std::move(university_values)));
 
-    std::vector<execution::Value> company_values;
+    std::vector<Value> company_values;
     const auto work_edges = person_work_at_out.get_edges(v);
     for (auto it = work_edges.begin(); it != work_edges.end(); ++it) {
       const vid_t org_vid = *it;
@@ -415,39 +421,48 @@ execution::Context exec_ic1(const function::CallFuncInputBase& input,
       if (place_vid != StorageReadInterface::kInvalidVid) {
         country_name = std::string(place_name_col->get_view(place_vid));
       }
-      std::vector<execution::Value> tuple_vals;
-      tuple_vals.emplace_back(execution::Value::STRING(
+      std::vector<Value> tuple_vals;
+      tuple_vals.emplace_back(Value::STRING(
           std::string(org_name_col->get_view(org_vid))));
-      tuple_vals.emplace_back(execution::Value::INT32(work_from));
+      tuple_vals.emplace_back(Value::INT32(work_from));
       tuple_vals.emplace_back(
-          execution::Value::STRING(std::move(country_name)));
+          Value::STRING(std::move(country_name)));
       company_values.emplace_back(
-          execution::Value::STRUCT(kOrgPlaceTupleType, std::move(tuple_vals)));
+          Value::STRUCT(kOrgPlaceTupleType, std::move(tuple_vals)));
     }
     companies_builder.push_back_elem(
-        execution::Value::LIST(kOrgPlaceTupleType, std::move(company_values)));
+        Value::LIST(kOrgPlaceTupleType, std::move(company_values)));
   }
 
-  return ldbc::make_output_context(
-      args.output_aliases,
-      {friend_id_builder.finish(), distance_builder.finish(),
-       last_name_builder.finish(), birthday_builder.finish(),
-       creation_date_builder.finish(), gender_builder.finish(),
-       browser_used_builder.finish(), location_ip_builder.finish(),
-       city_name_builder.finish(), email_builder.finish(),
-       language_builder.finish(), universities_builder.finish(),
-       companies_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, friend_id_builder.finish());
+  chunk.set(1, distance_builder.finish());
+  chunk.set(2, last_name_builder.finish());
+  chunk.set(3, birthday_builder.finish());
+  chunk.set(4, creation_date_builder.finish());
+  chunk.set(5, gender_builder.finish());
+  chunk.set(6, browser_used_builder.finish());
+  chunk.set(7, location_ip_builder.finish());
+  chunk.set(8, city_name_builder.finish());
+  chunk.set(9, email_builder.finish());
+  chunk.set(10, language_builder.finish());
+  chunk.set(11, universities_builder.finish());
+  chunk.set(12, companies_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC1Function::getFunctionSet() {
   const auto kOrgPlaceListType =
       common::DataType::List(kOrgPlaceTupleCatalogType);
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC1Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kVarchar},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kVarchar)},
       function::call_output_columns{
           {"friendId", common::DataType(common::DataTypeId::kInt64)},
           {"distanceFromPerson", common::DataType(common::DataTypeId::kInt32)},
@@ -462,8 +477,8 @@ function::function_set IC1Function::getFunctionSet() {
           {"friendLanguage", common::DataType(common::DataTypeId::kVarchar)},
           {"friendUniversities", kOrgPlaceListType},
           {"friendCompanies", kOrgPlaceListType}});
-  fn->bindFunc = bind_ic1;
-  fn->execFunc = exec_ic1;
+  fn->bindFunc = IC1::bind;
+  fn->execFunc = IC1::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

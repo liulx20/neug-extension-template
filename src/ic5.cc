@@ -23,16 +23,16 @@
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kTopN = 20;
-constexpr size_t kNumOutputColumns = 2;
+class IC5 {
+public:
+static constexpr size_t kTopN = 20;
 
 struct ForumInfo {
   vid_t forum_vid = 0;
@@ -52,7 +52,7 @@ struct ForumInfoComparer {
   }
 };
 
-void collect_knows_1d_2d_neighbors(const StorageReadInterface& graph,
+static void collect_knows_1d_2d_neighbors(const StorageReadInterface& graph,
                                    label_t person_label, label_t knows_label,
                                    vid_t root, std::vector<vid_t>* friends) {
   const auto out_view = graph.GetGenericOutgoingGraphView(
@@ -96,7 +96,7 @@ void collect_knows_1d_2d_neighbors(const StorageReadInterface& graph,
   }
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic5(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -110,12 +110,11 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic5(
   return input;
 }
 
-execution::Context exec_ic5(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& ic5_input = dynamic_cast<const IC5FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const int64_t min_date_ms = params.at("minDate").GetValue<int64_t>();
+  const int64_t person_id = ic5_input.person_id;
+  const int64_t min_date_ms = ic5_input.min_date_ms;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -135,7 +134,7 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -262,8 +261,8 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
     que.pop();
   }
 
-  execution::ValueColumnBuilder<std::string> forum_title_builder;
-  execution::ValueColumnBuilder<int32_t> post_count_builder;
+  ValueColumnBuilder<std::string> forum_title_builder;
+  ValueColumnBuilder<int32_t> post_count_builder;
   forum_title_builder.reserve(results.size());
   post_count_builder.reserve(results.size());
   for (size_t i = results.size(); i > 0; --i) {
@@ -273,26 +272,27 @@ execution::Context exec_ic5(const function::CallFuncInputBase& input,
     post_count_builder.push_back_opt(row.post_count);
   }
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = forum_title_builder.finish();
-  output_columns[1] = post_count_builder.finish();
-  return ldbc::make_output_context(ic5_input.output_aliases,
-                                   {output_columns[0], output_columns[1]});
+  execution::ContextChunk chunk;
+  chunk.set(0, forum_title_builder.finish());
+  chunk.set(1, post_count_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = ic5_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC5Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IC5Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"forumTitle", common::DataType(common::DataTypeId::kVarchar)},
           {"postCount", common::DataType(common::DataTypeId::kInt32)}});
-  function->bindFunc = bind_ic5;
-  function->execFunc = exec_ic5;
+  function->bindFunc = IC5::bind;
+  function->execFunc = IC5::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;

@@ -16,34 +16,31 @@
 
 #include "is6.h"
 
-#include <array>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
 
-constexpr size_t kNumOutputColumns = 5;
-
-std::unique_ptr<function::CallFuncInputBase> bind_is6(
+class IS6 {
+public:
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params =
-      plan.plan(op_idx).opr().procedure_call().query().arguments();
+
   auto input = std::make_unique<IS6FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
-execution::Context exec_is6(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& is6_input = dynamic_cast<const IS6FuncInput&>(input);
-  const int64_t message_id = params.at("messageId").GetValue<int64_t>();
+  const int64_t message_id = is6_input.message_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -96,11 +93,11 @@ execution::Context exec_is6(const function::CallFuncInputBase& input,
     return execution::Context{};
   }
 
-  execution::ValueColumnBuilder<int64_t> forum_id_builder;
-  execution::ValueColumnBuilder<std::string> forum_title_builder;
-  execution::ValueColumnBuilder<int64_t> moderator_id_builder;
-  execution::ValueColumnBuilder<std::string> moderator_first_builder;
-  execution::ValueColumnBuilder<std::string> moderator_last_builder;
+  ValueColumnBuilder<int64_t> forum_id_builder;
+  ValueColumnBuilder<std::string> forum_title_builder;
+  ValueColumnBuilder<int64_t> moderator_id_builder;
+  ValueColumnBuilder<std::string> moderator_first_builder;
+  ValueColumnBuilder<std::string> moderator_last_builder;
 
   forum_id_builder.push_back_opt(
       forum_id_col->get_view(forum_vid));
@@ -113,34 +110,34 @@ execution::Context exec_is6(const function::CallFuncInputBase& input,
   moderator_last_builder.push_back_opt(
       std::string(last_name_col->get_view(moderator_vid)));
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = forum_id_builder.finish();
-  output_columns[1] = forum_title_builder.finish();
-  output_columns[2] = moderator_id_builder.finish();
-  output_columns[3] = moderator_first_builder.finish();
-  output_columns[4] = moderator_last_builder.finish();
 
-  return ldbc::make_output_context(
-      is6_input.output_aliases,
-      {output_columns[0], output_columns[1], output_columns[2],
-       output_columns[3], output_columns[4]});
+
+  execution::ContextChunk chunk;
+  chunk.set(0, forum_id_builder.finish());
+  chunk.set(1, forum_title_builder.finish());
+  chunk.set(2, moderator_id_builder.finish());
+  chunk.set(3, moderator_first_builder.finish());
+  chunk.set(4, moderator_last_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = is6_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IS6Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS6Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"forumId", common::DataType(common::DataTypeId::kInt64)},
           {"forumTitle", common::DataType(common::DataTypeId::kVarchar)},
           {"moderatorId", common::DataType(common::DataTypeId::kInt64)},
           {"moderatorFirstName", common::DataType(common::DataTypeId::kVarchar)},
           {"moderatorLastName", common::DataType(common::DataTypeId::kVarchar)}});
-  function->bindFunc = bind_is6;
-  function->execFunc = exec_is6;
+  function->bindFunc = IS6::bind;
+  function->execFunc = IS6::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;

@@ -17,20 +17,21 @@
 #include "is7.h"
 
 #include <algorithm>
-#include <array>
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
 
-constexpr size_t kNumOutputColumns = 7;
 
+
+class IS7 {
+public:
 struct ReplyInfo {
   vid_t comment_vid = 0;
   vid_t author_vid = 0;
@@ -39,21 +40,19 @@ struct ReplyInfo {
   int64_t creation_date_ms = 0;
 };
 
-std::unique_ptr<function::CallFuncInputBase> bind_is7(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params =
-      plan.plan(op_idx).opr().procedure_call().query().arguments();
   auto input = std::make_unique<IS7FuncInput>();
   ldbc::bind_ldbc_call(plan, op_idx, input.get());
   return input;
 }
 
-execution::Context exec_is7(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& is7_input = dynamic_cast<const IS7FuncInput&>(input);
-  const int64_t message_id = params.at("messageId").GetValue<int64_t>();
+  const int64_t message_id = is7_input.message_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -82,8 +81,6 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
 
   const auto comment_has_creator_out = graph.GetGenericOutgoingGraphView(
       comment_label, person_label, has_creator_label);
-  const bool has_edge_date = schema.edge_has_property(
-      comment_label, person_label, has_creator_label, "creationDate");
   auto
     edge_accessor = graph.GetEdgeDataAccessor(
         comment_label, person_label, has_creator_label, "creationDate");
@@ -155,13 +152,13 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
   mark_knows(knows_out);
   mark_knows(knows_in);
 
-  execution::ValueColumnBuilder<int64_t> comment_id_builder;
-  execution::ValueColumnBuilder<std::string> comment_content_builder;
-  execution::ValueColumnBuilder<DateTime> comment_date_builder;
-  execution::ValueColumnBuilder<int64_t> reply_author_id_builder;
-  execution::ValueColumnBuilder<std::string> reply_author_first_builder;
-  execution::ValueColumnBuilder<std::string> reply_author_last_builder;
-  execution::ValueColumnBuilder<bool> knows_builder;
+  ValueColumnBuilder<int64_t> comment_id_builder;
+  ValueColumnBuilder<std::string> comment_content_builder;
+  ValueColumnBuilder<DateTime> comment_date_builder;
+  ValueColumnBuilder<int64_t> reply_author_id_builder;
+  ValueColumnBuilder<std::string> reply_author_first_builder;
+  ValueColumnBuilder<std::string> reply_author_last_builder;
+  ValueColumnBuilder<bool> knows_builder;
 
   for (const auto& reply : replies) {
     comment_id_builder.push_back_opt(reply.comment_id);
@@ -176,29 +173,26 @@ execution::Context exec_is7(const function::CallFuncInputBase& input,
     knows_builder.push_back_opt(knows_author[reply.author_vid]);
   }
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = comment_id_builder.finish();
-  output_columns[1] = comment_content_builder.finish();
-  output_columns[2] = comment_date_builder.finish();
-  output_columns[3] = reply_author_id_builder.finish();
-  output_columns[4] = reply_author_first_builder.finish();
-  output_columns[5] = reply_author_last_builder.finish();
-  output_columns[6] = knows_builder.finish();
-
-  return ldbc::make_output_context(
-      is7_input.output_aliases,
-      {output_columns[0], output_columns[1], output_columns[2],
-       output_columns[3], output_columns[4], output_columns[5],
-       output_columns[6]});
+  execution::ContextChunk chunk;
+  chunk.set(0, comment_id_builder.finish());
+  chunk.set(1, comment_content_builder.finish());
+  chunk.set(2, comment_date_builder.finish());
+  chunk.set(3, reply_author_id_builder.finish());
+  chunk.set(4, reply_author_first_builder.finish());
+  chunk.set(5, reply_author_last_builder.finish());
+  chunk.set(6, knows_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = is7_input.output_aliases;
+  return ctx;
 }
+};
 
-}  // namespace
 
 function::function_set IS7Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS7Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"commentId", common::DataType(common::DataTypeId::kInt64)},
           {"commentContent", common::DataType(common::DataTypeId::kVarchar)},
@@ -207,8 +201,8 @@ function::function_set IS7Function::getFunctionSet() {
           {"replyAuthorFirstName", common::DataType(common::DataTypeId::kVarchar)},
           {"replyAuthorLastName", common::DataType(common::DataTypeId::kVarchar)},
           {"isReplyAuthorKnowsOriginalMessageAuthor", common::DataType(common::DataTypeId::kBoolean)}});
-  function->bindFunc = bind_is7;
-  function->execFunc = exec_is7;
+  function->bindFunc = IS7::bind;
+  function->execFunc = IS7::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;

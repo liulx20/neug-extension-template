@@ -21,16 +21,17 @@
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kTopN = 10;
-constexpr int64_t kMillisPerDay = 24L * 60 * 60 * 1000;
+class IC4 {
+public:
+static constexpr size_t kTopN = 10;
+static constexpr int64_t kMillisPerDay = 24L * 60 * 60 * 1000;
 
 struct TagRow {
   int count = 0;
@@ -46,7 +47,7 @@ struct TagRowCmp {
   }
 };
 
-void try_push_tag(
+static void try_push_tag(
     std::priority_queue<TagRow, std::vector<TagRow>, TagRowCmp>* heap,
     int count, std::string_view name) {
   if (count == 0) {
@@ -63,7 +64,7 @@ void try_push_tag(
   }
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic4(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -77,13 +78,12 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic4(
   return input;
 }
 
-execution::Context exec_ic4(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC4FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const int64_t start_date_ms = params.at("startDate").GetValue<int64_t>();
-  const int64_t duration_days = params.at("durationDays").GetValue<int64_t>();
+  const int64_t person_id = args.person_id;
+  const int64_t start_date_ms = args.start_date_ms;
+  const int64_t duration_days = args.duration_days;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -101,7 +101,7 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -169,8 +169,8 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
     heap.pop();
   }
 
-  execution::ValueColumnBuilder<std::string> name_builder;
-  execution::ValueColumnBuilder<int32_t> count_builder;
+  ValueColumnBuilder<std::string> name_builder;
+  ValueColumnBuilder<int32_t> count_builder;
   name_builder.reserve(rows.size());
   count_builder.reserve(rows.size());
   for (size_t i = rows.size(); i > 0; --i) {
@@ -178,22 +178,27 @@ execution::Context exec_ic4(const function::CallFuncInputBase& input,
     count_builder.push_back_opt(rows[i - 1].count);
   }
 
-  return ldbc::make_output_context(
-      args.output_aliases, {name_builder.finish(), count_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, name_builder.finish());
+  chunk.set(1, count_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC4Function::getFunctionSet() {
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC4Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kInt64,
-                                      common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{{"tagName", common::DataType(common::DataTypeId::kVarchar)},
                                     {"postCount", common::DataType(common::DataTypeId::kInt32)}});
-  fn->bindFunc = bind_ic4;
-  fn->execFunc = exec_ic4;
+  fn->bindFunc = IC4::bind;
+  fn->execFunc = IC4::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

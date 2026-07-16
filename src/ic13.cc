@@ -21,15 +21,16 @@
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-std::unique_ptr<function::CallFuncInputBase> bind_ic13(
+class IC13 {
+public:
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -43,7 +44,7 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic13(
   return input;
 }
 
-int32_t shortest_path_length(const StorageReadInterface& graph,
+static int32_t shortest_path_length(const StorageReadInterface& graph,
                              label_t person_label, label_t knows_label,
                              vid_t src, vid_t dst) {
   if (src == dst) {
@@ -129,12 +130,11 @@ int32_t shortest_path_length(const StorageReadInterface& graph,
   return -1;
 }
 
-execution::Context exec_ic13(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface,
-                             const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                             IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC13FuncInput&>(input);
-  const int64_t person1_id = params.at("person1Id").GetValue<int64_t>();
-  const int64_t person2_id = params.at("person2Id").GetValue<int64_t>();
+  const int64_t person1_id = args.person1_id;
+  const int64_t person2_id = args.person2_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -144,32 +144,36 @@ execution::Context exec_ic13(const function::CallFuncInputBase& input,
   vid_t src = StorageReadInterface::kInvalidVid;
   vid_t dst = StorageReadInterface::kInvalidVid;
   int32_t result = 0;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person1_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person1_id),
                             src) ||
-      !graph.GetVertexIndex(person_label, execution::Value::INT64(person2_id),
+      !graph.GetVertexIndex(person_label, Value::INT64(person2_id),
                             dst)) {
     result = -1;
   } else {
     result = shortest_path_length(graph, person_label, knows_label, src, dst);
   }
 
-  execution::ValueColumnBuilder<int32_t> length_builder;
+  ValueColumnBuilder<int32_t> length_builder;
   length_builder.push_back_opt(result);
-  return ldbc::make_output_context(args.output_aliases,
-                                   {length_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, length_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC13Function::getFunctionSet() {
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC13Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"shortestPathLength", common::DataType(common::DataTypeId::kInt32)}});
-  fn->bindFunc = bind_ic13;
-  fn->execFunc = exec_ic13;
+  fn->bindFunc = IC13::bind;
+  fn->execFunc = IC13::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

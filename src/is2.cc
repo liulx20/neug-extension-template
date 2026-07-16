@@ -21,16 +21,16 @@
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kTopN = 10;
-constexpr size_t kNumOutputColumns = 7;
+class IS2 {
+public:
+static constexpr size_t kTopN = 10;
 
 struct MessageInfo {
   vid_t message_vid = 0;
@@ -51,7 +51,7 @@ struct MessageInfoComparer {
   }
 };
 
-void consider_message(std::priority_queue<MessageInfo, std::vector<MessageInfo>,
+static void consider_message(std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                                           MessageInfoComparer>& pq,
                       const MessageInfo& candidate) {
   if (pq.size() < kTopN) {
@@ -71,7 +71,7 @@ void consider_message(std::priority_queue<MessageInfo, std::vector<MessageInfo>,
   }
 }
 
-void scan_person_messages(
+static void scan_person_messages(
     const StorageReadInterface& graph, const Schema& schema,
     const ldbc::TypedView& has_creator_in, label_t person_label,
     label_t message_label, bool is_post, vid_t person_vid,
@@ -116,7 +116,7 @@ void scan_person_messages(
   }
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_is2(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -126,11 +126,10 @@ std::unique_ptr<function::CallFuncInputBase> bind_is2(
   return input;
 }
 
-execution::Context exec_is2(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& is2_input = dynamic_cast<const IS2FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t person_id = is2_input.person_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -152,7 +151,7 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
   }
 
   vid_t person_vid = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             person_vid)) {
     return execution::Context{};
   }
@@ -180,13 +179,13 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
   const auto post_has_creator_out = graph.GetGenericOutgoingGraphView(
       post_label, person_label, has_creator_label);
 
-  execution::ValueColumnBuilder<int64_t> message_id_builder;
-  execution::ValueColumnBuilder<std::string> message_content_builder;
-  execution::ValueColumnBuilder<DateTime> message_date_builder;
-  execution::ValueColumnBuilder<int64_t> original_post_id_builder;
-  execution::ValueColumnBuilder<int64_t> original_post_author_id_builder;
-  execution::ValueColumnBuilder<std::string> original_post_author_first_builder;
-  execution::ValueColumnBuilder<std::string> original_post_author_last_builder;
+  ValueColumnBuilder<int64_t> message_id_builder;
+  ValueColumnBuilder<std::string> message_content_builder;
+  ValueColumnBuilder<DateTime> message_date_builder;
+  ValueColumnBuilder<int64_t> original_post_id_builder;
+  ValueColumnBuilder<int64_t> original_post_author_id_builder;
+  ValueColumnBuilder<std::string> original_post_author_first_builder;
+  ValueColumnBuilder<std::string> original_post_author_last_builder;
 
   message_id_builder.reserve(results.size());
   message_content_builder.reserve(results.size());
@@ -228,29 +227,27 @@ execution::Context exec_is2(const function::CallFuncInputBase& input,
     }
   }
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = message_id_builder.finish();
-  output_columns[1] = message_content_builder.finish();
-  output_columns[2] = message_date_builder.finish();
-  output_columns[3] = original_post_id_builder.finish();
-  output_columns[4] = original_post_author_id_builder.finish();
-  output_columns[5] = original_post_author_first_builder.finish();
-  output_columns[6] = original_post_author_last_builder.finish();
 
-  return ldbc::make_output_context(
-      is2_input.output_aliases,
-      {output_columns[0], output_columns[1], output_columns[2],
-       output_columns[3], output_columns[4], output_columns[5],
-       output_columns[6]});
+  execution::ContextChunk chunk;
+  chunk.set(0, message_id_builder.finish());
+  chunk.set(1, message_content_builder.finish());
+  chunk.set(2, message_date_builder.finish());
+  chunk.set(3, original_post_id_builder.finish());
+  chunk.set(4, original_post_author_id_builder.finish());
+  chunk.set(5, original_post_author_first_builder.finish());
+  chunk.set(6, original_post_author_last_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = is2_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IS2Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS2Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"messageId", common::DataType(common::DataTypeId::kInt64)},
           {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
@@ -259,8 +256,8 @@ function::function_set IS2Function::getFunctionSet() {
           {"originalPostAuthorId", common::DataType(common::DataTypeId::kInt64)},
           {"originalPostAuthorFirstName", common::DataType(common::DataTypeId::kVarchar)},
           {"originalPostAuthorLastName", common::DataType(common::DataTypeId::kVarchar)}});
-  function->bindFunc = bind_is2;
-  function->execFunc = exec_is2;
+  function->bindFunc = IS2::bind;
+  function->execFunc = IS2::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;

@@ -67,10 +67,6 @@ inline size_t count_edges(const CsrView& view, vid_t vertex) {
 void bind_output_aliases(const ::physical::PhysicalPlan& plan, int op_idx,
                          std::vector<int>* output_aliases);
 
-execution::Context make_output_context(
-    const std::vector<int>& output_aliases,
-    const std::vector<std::shared_ptr<execution::IContextColumn>>& columns);
-
 bool find_message_vertex(const StorageReadInterface& graph, label_t post_label,
                          label_t comment_label, int64_t message_id,
                          vid_t* message_vid, bool* is_post);

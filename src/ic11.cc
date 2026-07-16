@@ -20,15 +20,16 @@
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kTopN = 10;
+class IC11 {
+public:
+static constexpr size_t kTopN = 10;
 
 struct WorkResult {
   vid_t person_vid = 0;
@@ -55,7 +56,7 @@ struct WorkResultComparer {
   }
 };
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic11(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -69,14 +70,13 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic11(
   return input;
 }
 
-execution::Context exec_ic11(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface,
-                             const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                             IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC11FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t person_id = args.person_id;
   const std::string country_name =
-      params.at("countryName").GetValue<std::string>();
-  const int32_t work_from_year = params.at("workFromYear").GetValue<int32_t>();
+      args.country_name;
+  const int32_t work_from_year = args.work_from_year;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -99,7 +99,7 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -168,11 +168,11 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
     pq.pop();
   }
 
-  execution::ValueColumnBuilder<int64_t> person_id_builder;
-  execution::ValueColumnBuilder<std::string> first_name_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ValueColumnBuilder<std::string> org_name_builder;
-  execution::ValueColumnBuilder<int32_t> work_from_builder;
+  ValueColumnBuilder<int64_t> person_id_builder;
+  ValueColumnBuilder<std::string> first_name_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ValueColumnBuilder<std::string> org_name_builder;
+  ValueColumnBuilder<int32_t> work_from_builder;
 
   for (size_t i = results.size(); i > 0; --i) {
     const auto& row = results[i - 1];
@@ -185,29 +185,34 @@ execution::Context exec_ic11(const function::CallFuncInputBase& input,
     work_from_builder.push_back_opt(row.work_from);
   }
 
-  return ldbc::make_output_context(
-      args.output_aliases,
-      {person_id_builder.finish(), first_name_builder.finish(),
-       last_name_builder.finish(), org_name_builder.finish(),
-       work_from_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, person_id_builder.finish());
+  chunk.set(1, first_name_builder.finish());
+  chunk.set(2, last_name_builder.finish());
+  chunk.set(3, org_name_builder.finish());
+  chunk.set(4, work_from_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC11Function::getFunctionSet() {
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC11Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kVarchar,
-                                      common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kVarchar),
+                                      common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"personId", common::DataType(common::DataTypeId::kInt64)},
           {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
           {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
           {"organizationName", common::DataType(common::DataTypeId::kVarchar)},
           {"organizationWorkFromYear", common::DataType(common::DataTypeId::kInt32)}});
-  fn->bindFunc = bind_ic11;
-  fn->execFunc = exec_ic11;
+  fn->bindFunc = IC11::bind;
+  fn->execFunc = IC11::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

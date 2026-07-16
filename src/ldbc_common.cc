@@ -36,30 +36,19 @@ void bind_output_aliases(const ::physical::PhysicalPlan& plan, int op_idx,
   }
 }
 
-execution::Context make_output_context(
-    const std::vector<int>& output_aliases,
-    const std::vector<std::shared_ptr<execution::IContextColumn>>& columns) {
-  execution::Context ctx;
-  execution::ContextChunk out_chunk;
-  ctx.tag_ids = output_aliases;
-  for (size_t i = 0; i < output_aliases.size(); ++i) {
-    out_chunk.set(output_aliases[i], columns[i]);
-  }
-  ctx.append_chunk(std::move(out_chunk));
-  return ctx;
-}
+
 
 bool find_message_vertex(const StorageReadInterface& graph, label_t post_label,
                          label_t comment_label, int64_t message_id,
                          vid_t* message_vid, bool* is_post) {
   vid_t vid = StorageReadInterface::kInvalidVid;
-  if (graph.GetVertexIndex(post_label, execution::Value::INT64(message_id),
+  if (graph.GetVertexIndex(post_label, Value::INT64(message_id),
                            vid)) {
     *message_vid = vid;
     *is_post = true;
     return true;
   }
-  if (graph.GetVertexIndex(comment_label, execution::Value::INT64(message_id),
+  if (graph.GetVertexIndex(comment_label, Value::INT64(message_id),
                            vid)) {
     *message_vid = vid;
     *is_post = false;

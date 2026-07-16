@@ -21,7 +21,7 @@
 
 #include "neug/compiler/function/function.h"
 #include "neug/compiler/function/neug_scalar_function.h"
-#include "neug/execution/common/types/value.h"
+#include "neug/common/types/value.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
@@ -48,7 +48,7 @@ struct WiggleFunction {
     if (val.type().id() != common::DataTypeId::kVarchar) {
       THROW_RUNTIME_ERROR("WIGGLE: input value is not a string");
     }
-    std::string str(execution::StringValue::Get(val));
+    std::string str(StringValue::Get(val));
     return execution::Value::STRING("~~~~~~~~~🌐 " + str);
   }
 };

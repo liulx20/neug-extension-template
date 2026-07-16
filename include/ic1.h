@@ -27,7 +27,16 @@ namespace neug {
 namespace extension {
 namespace ldbc_ic {
 
-struct IC1FuncInput : ldbc::LdbcCallInput {};
+struct IC1FuncInput : ldbc::LdbcCallInput {
+  int64_t person_id;
+  std::string first_name;
+
+  void bindParams(const execution::ParamsMap& params) override {
+    person_id = params.at("personId").GetValue<int64_t>();
+    first_name = params.at("firstName").GetValue<std::string>();
+  }
+};
+
 
 struct IC1Function {
   static constexpr const char* name = "ic1";

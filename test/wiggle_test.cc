@@ -17,7 +17,7 @@
 #include <filesystem>
 #include <vector>
 
-#include "neug/execution/common/types/value.h"
+#include "neug/common/types/value.h"
 #include "neug/main/neug_db.h"
 #include "wiggle_function.h"
 
@@ -29,10 +29,10 @@ const char* Name();
 TEST(WiggleExtension, Name) { EXPECT_STREQ(Name(), "WIGGLE"); }
 
 TEST(WiggleExtension, Exec) {
-  std::vector<neug::execution::Value> args;
-  args.push_back(neug::execution::Value::STRING("Sam"));
+  std::vector<neug::Value> args;
+  args.push_back(neug::Value::STRING("Sam"));
   auto result = neug::extension::wiggle::WiggleFunction::Exec(args);
-  EXPECT_EQ(neug::execution::StringValue::Get(result), "~~~~~~~~~🌐 Sam");
+  EXPECT_EQ(neug::StringValue::Get(result), "~~~~~~~~~🌐 Sam");
 }
 
 TEST(WiggleExtension, FunctionSet) {

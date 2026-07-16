@@ -16,22 +16,21 @@
 
 #include "ic6.h"
 
-#include <array>
 #include <queue>
 #include <string>
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kTopN = 10;
-constexpr size_t kNumOutputColumns = 2;
+class IC6 {
+public:
+static constexpr size_t kTopN = 10;
 
 struct TagResult {
   int count = 0;
@@ -50,7 +49,7 @@ struct TagResultComparer {
   }
 };
 
-void try_push_tag(std::priority_queue<TagResult, std::vector<TagResult>,
+static void try_push_tag(std::priority_queue<TagResult, std::vector<TagResult>,
                                       TagResultComparer>* heap,
                   int count, std::string_view tag_name) {
   if (count == 0) {
@@ -67,7 +66,7 @@ void try_push_tag(std::priority_queue<TagResult, std::vector<TagResult>,
   }
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic6(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -81,12 +80,11 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic6(
   return input;
 }
 
-execution::Context exec_ic6(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& ic6_input = dynamic_cast<const IC6FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const std::string tag_name = params.at("tagName").GetValue<std::string>();
+  const int64_t person_id = ic6_input.person_id;
+  const std::string tag_name = ic6_input.tag_name;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -104,7 +102,7 @@ execution::Context exec_ic6(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -162,8 +160,8 @@ execution::Context exec_ic6(const function::CallFuncInputBase& input,
     heap.pop();
   }
 
-  execution::ValueColumnBuilder<std::string> tag_name_builder;
-  execution::ValueColumnBuilder<int32_t> post_count_builder;
+  ValueColumnBuilder<std::string> tag_name_builder;
+  ValueColumnBuilder<int32_t> post_count_builder;
   tag_name_builder.reserve(results.size());
   post_count_builder.reserve(results.size());
   for (size_t i = results.size(); i > 0; --i) {
@@ -171,25 +169,26 @@ execution::Context exec_ic6(const function::CallFuncInputBase& input,
     post_count_builder.push_back_opt(results[i - 1].count);
   }
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = tag_name_builder.finish();
-  output_columns[1] = post_count_builder.finish();
-  return ldbc::make_output_context(ic6_input.output_aliases,
-                                   {output_columns[0], output_columns[1]});
+  execution::ContextChunk chunk;
+  chunk.set(0, tag_name_builder.finish());
+  chunk.set(1, post_count_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = ic6_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC6Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IC6Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kVarchar},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kVarchar)},
       function::call_output_columns{{"tagName", common::DataType(common::DataTypeId::kVarchar)},
                                     {"postCount", common::DataType(common::DataTypeId::kInt32)}});
-  function->bindFunc = bind_ic6;
-  function->execFunc = exec_ic6;
+  function->bindFunc = IC6::bind;
+  function->execFunc = IC6::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;

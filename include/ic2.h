@@ -29,11 +29,19 @@ namespace neug {
 namespace extension {
 namespace ldbc_ic {
 
-struct IC2FuncInput : ldbc::LdbcCallInput {};
+struct IC2FuncInput : ldbc::LdbcCallInput {
+  int64_t person_id;
+  int64_t max_date_ms;
+
+  void bindParams(const execution::ParamsMap& params) override {
+    person_id = params.at("personId").GetValue<int64_t>();
+    max_date_ms = params.at("maxDate").GetValue<int64_t>();
+  }
+};
+
 
 struct IC2Function {
   static constexpr const char* name = "ic2";
-
   static function::function_set getFunctionSet();
 };
 

@@ -20,15 +20,16 @@
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kTopN = 10;
+class IC10 {
+public:
+static constexpr size_t kTopN = 10;
 
 struct PersonResult {
   int score = 0;
@@ -48,14 +49,14 @@ struct PersonResultComparer {
   }
 };
 
-bool matches_zodiac_month(const Date& birthday, int month) {
+static bool matches_zodiac_month(const Date& birthday, int month) {
   const int this_month = month;
   const int next_month = (month == 12) ? 1 : (month + 1);
   return (birthday.month() == this_month && birthday.day() >= 21) ||
          (birthday.month() == next_month && birthday.day() < 22);
 }
 
-int score_friend_posts(const StorageReadInterface& graph, vid_t friend_vid,
+static int score_friend_posts(const StorageReadInterface& graph, vid_t friend_vid,
                        const CsrView& post_has_creator_in,
                        const CsrView& post_has_tag_out,
                        const std::vector<bool>& has_interests) {
@@ -76,7 +77,7 @@ int score_friend_posts(const StorageReadInterface& graph, vid_t friend_vid,
   return score;
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic10(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -90,12 +91,11 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic10(
   return input;
 }
 
-execution::Context exec_ic10(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface,
-                             const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                             IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC10FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
-  const int32_t month = params.at("month").GetValue<int32_t>();
+  const int64_t person_id = args.person_id;
+  const int32_t month = args.month;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -126,7 +126,7 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -217,12 +217,12 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
     pq.pop();
   }
 
-  execution::ValueColumnBuilder<int64_t> person_id_builder;
-  execution::ValueColumnBuilder<std::string> first_name_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ValueColumnBuilder<int32_t> score_builder;
-  execution::ValueColumnBuilder<std::string> gender_builder;
-  execution::ValueColumnBuilder<std::string> city_builder;
+  ValueColumnBuilder<int64_t> person_id_builder;
+  ValueColumnBuilder<std::string> first_name_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ValueColumnBuilder<int32_t> score_builder;
+  ValueColumnBuilder<std::string> gender_builder;
+  ValueColumnBuilder<std::string> city_builder;
 
   for (size_t i = results.size(); i > 0; --i) {
     const auto& row = results[i - 1];
@@ -244,20 +244,26 @@ execution::Context exec_ic10(const function::CallFuncInputBase& input,
     }
   }
 
-  return ldbc::make_output_context(
-      args.output_aliases,
-      {person_id_builder.finish(), first_name_builder.finish(),
-       last_name_builder.finish(), score_builder.finish(),
-       gender_builder.finish(), city_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, person_id_builder.finish());
+  chunk.set(1, first_name_builder.finish());
+  chunk.set(2, last_name_builder.finish());
+  chunk.set(3, score_builder.finish());
+  chunk.set(4, gender_builder.finish());
+  chunk.set(5, city_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC10Function::getFunctionSet() {
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC10Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"personId", common::DataType(common::DataTypeId::kInt64)},
           {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
@@ -265,8 +271,8 @@ function::function_set IC10Function::getFunctionSet() {
           {"score", common::DataType(common::DataTypeId::kInt32)},
           {"personGender", common::DataType(common::DataTypeId::kVarchar)},
           {"cityName", common::DataType(common::DataTypeId::kVarchar)}});
-  fn->bindFunc = bind_ic10;
-  fn->execFunc = exec_ic10;
+  fn->bindFunc = IC10::bind;
+  fn->execFunc = IC10::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

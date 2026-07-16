@@ -26,7 +26,13 @@ namespace neug {
 namespace extension {
 namespace ldbc_ic {
 
-struct IS3FuncInput : ldbc::LdbcCallInput {};
+struct IS3FuncInput : ldbc::LdbcCallInput {
+  int64_t person_id;
+
+  void bindParams(const execution::ParamsMap& params) override {
+    person_id = params.at("personId").GetValue<int64_t>();
+  }
+};
 
 struct IS3Function {
   static constexpr const char* name = "is3";

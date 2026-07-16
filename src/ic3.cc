@@ -16,24 +16,27 @@
 
 #include "ic3.h"
 
-#include <array>
+
 #include <queue>
 #include <string>
 #include <vector>
 
 #include "ldbc_common.h"
 #include "neug/compiler/common/types/types.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/execution/common/context.h"
+#include "neug/execution/common/context_chunk.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
 
-constexpr size_t kTopN = 20;
-constexpr int64_t kMillisPerDay = 24L * 60 * 60 * 1000;
+class IC3 {
+public:
+static constexpr size_t kTopN = 20;
+static constexpr int64_t kMillisPerDay = 24L * 60 * 60 * 1000;
+
 
 struct PersonResult {
   int total = 0;
@@ -55,7 +58,7 @@ struct PersonResultComparer {
   }
 };
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic3(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& procedure_call = plan.plan(op_idx).opr().procedure_call();
@@ -71,17 +74,16 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic3(
   return input;
 }
 
-execution::Context exec_ic3(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& ic3_input = dynamic_cast<const IC3FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t person_id = ic3_input.person_id;
   const std::string country_x_name =
-      params.at("countryXName").GetValue<std::string>();
+      ic3_input.country_x_name;
   const std::string country_y_name =
-      params.at("countryYName").GetValue<std::string>();
-  const int64_t start_date_ms = params.at("startDate").GetValue<int64_t>();
-  const int64_t duration_days = params.at("durationDays").GetValue<int64_t>();
+      ic3_input.country_y_name;
+  const int64_t start_date_ms = ic3_input.start_date_ms;
+  const int64_t duration_days = ic3_input.duration_days;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -107,7 +109,7 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -229,12 +231,12 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
     pq.pop();
   }
 
-  execution::ValueColumnBuilder<int64_t> person_id_builder;
-  execution::ValueColumnBuilder<std::string> first_name_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ValueColumnBuilder<int64_t> country_x_builder;
-  execution::ValueColumnBuilder<int64_t> country_y_builder;
-  execution::ValueColumnBuilder<int64_t> total_builder;
+  ValueColumnBuilder<int64_t> person_id_builder;
+  ValueColumnBuilder<std::string> first_name_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ValueColumnBuilder<int64_t> country_x_builder;
+  ValueColumnBuilder<int64_t> country_y_builder;
+  ValueColumnBuilder<int64_t> total_builder;
 
   person_id_builder.reserve(results.size());
   first_name_builder.reserve(results.size());
@@ -255,22 +257,28 @@ execution::Context exec_ic3(const function::CallFuncInputBase& input,
     total_builder.push_back_opt(static_cast<int64_t>(row.total));
   }
 
-  return ldbc::make_output_context(
-      ic3_input.output_aliases,
-      {person_id_builder.finish(), first_name_builder.finish(),
-       last_name_builder.finish(), country_x_builder.finish(),
-       country_y_builder.finish(), total_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, person_id_builder.finish());
+  chunk.set(1, first_name_builder.finish());
+  chunk.set(2, last_name_builder.finish());
+  chunk.set(3, country_x_builder.finish());
+  chunk.set(4, country_y_builder.finish());
+  chunk.set(5, total_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = ic3_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC3Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IC3Function::name,
-      std::vector<common::DataTypeId>{
-          common::DataTypeId::kInt64, common::DataTypeId::kVarchar,
-          common::DataTypeId::kVarchar, common::DataTypeId::kInt64,
-          common::DataTypeId::kInt64},
+      function::call_input_types{
+          common::DataType(common::DataTypeId::kInt64), common::DataType(common::DataTypeId::kVarchar),
+          common::DataType(common::DataTypeId::kVarchar), common::DataType(common::DataTypeId::kInt64),
+          common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"personId", common::DataType(common::DataTypeId::kInt64)},
           {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
@@ -279,8 +287,8 @@ function::function_set IC3Function::getFunctionSet() {
           {"countryYCount", common::DataType(common::DataTypeId::kInt64)},
           {"totalCount", common::DataType(common::DataTypeId::kInt64)}});
 
-  function->bindFunc = bind_ic3;
-  function->execFunc = exec_ic3;
+  function->bindFunc = IC3::bind;
+  function->execFunc = IC3::exec;
 
   function::function_set function_set;
   function_set.push_back(std::move(function));

@@ -16,21 +16,19 @@
 
 #include "is1.h"
 
-#include <array>
 #include <string>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kNumOutputColumns = 8;
-
-std::unique_ptr<function::CallFuncInputBase> bind_is1(
+class IS1 {
+public:
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -40,11 +38,10 @@ std::unique_ptr<function::CallFuncInputBase> bind_is1(
   return input;
 }
 
-execution::Context exec_is1(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& is1_input = dynamic_cast<const IS1FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t person_id = is1_input.person_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -69,7 +66,7 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
   auto place_id_col = ldbc::get_vertex_column<int64_t>(graph, place_label, "id");
 
   vid_t person_vid = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             person_vid)) {
     return execution::Context{};
   }
@@ -83,14 +80,14 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
     city_id = place_id_col->get_view(place_vid);
   }
 
-  execution::ValueColumnBuilder<std::string> first_name_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ValueColumnBuilder<Date> birthday_builder;
-  execution::ValueColumnBuilder<std::string> location_ip_builder;
-  execution::ValueColumnBuilder<std::string> browser_used_builder;
-  execution::ValueColumnBuilder<int64_t> city_id_builder;
-  execution::ValueColumnBuilder<std::string> gender_builder;
-  execution::ValueColumnBuilder<DateTime> creation_date_builder;
+  ValueColumnBuilder<std::string> first_name_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ValueColumnBuilder<Date> birthday_builder;
+  ValueColumnBuilder<std::string> location_ip_builder;
+  ValueColumnBuilder<std::string> browser_used_builder;
+  ValueColumnBuilder<int64_t> city_id_builder;
+  ValueColumnBuilder<std::string> gender_builder;
+  ValueColumnBuilder<DateTime> creation_date_builder;
 
   first_name_builder.push_back_opt(
       std::string(first_name_col->get_view(person_vid)));
@@ -105,30 +102,28 @@ execution::Context exec_is1(const function::CallFuncInputBase& input,
   gender_builder.push_back_opt(std::string(gender_col->get_view(person_vid)));
   creation_date_builder.push_back_opt(creation_date_col->get_view(person_vid));
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = first_name_builder.finish();
-  output_columns[1] = last_name_builder.finish();
-  output_columns[2] = birthday_builder.finish();
-  output_columns[3] = location_ip_builder.finish();
-  output_columns[4] = browser_used_builder.finish();
-  output_columns[5] = city_id_builder.finish();
-  output_columns[6] = gender_builder.finish();
-  output_columns[7] = creation_date_builder.finish();
 
-  return ldbc::make_output_context(
-      is1_input.output_aliases,
-      {output_columns[0], output_columns[1], output_columns[2],
-       output_columns[3], output_columns[4], output_columns[5],
-       output_columns[6], output_columns[7]});
+  execution::ContextChunk chunk;
+  chunk.set(0, first_name_builder.finish());
+  chunk.set(1, last_name_builder.finish());
+  chunk.set(2, birthday_builder.finish());
+  chunk.set(3, location_ip_builder.finish());
+  chunk.set(4, browser_used_builder.finish());
+  chunk.set(5, city_id_builder.finish());
+  chunk.set(6, gender_builder.finish());
+  chunk.set(7, creation_date_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = is1_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IS1Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS1Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"firstName", common::DataType(common::DataTypeId::kVarchar)},
           {"lastName", common::DataType(common::DataTypeId::kVarchar)},
@@ -138,8 +133,8 @@ function::function_set IS1Function::getFunctionSet() {
           {"cityId", common::DataType(common::DataTypeId::kInt64)},
           {"gender", common::DataType(common::DataTypeId::kVarchar)},
           {"creationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
-  function->bindFunc = bind_is1;
-  function->execFunc = exec_is1;
+  function->bindFunc = IS1::bind;
+  function->execFunc = IS1::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;

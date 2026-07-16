@@ -26,21 +26,23 @@
 #include <vector>
 
 #include "ldbc_common.h"
+#include "neug/execution/common/context_chunk.h"
 #include "neug/common/extra_type_info.h"
 #include "neug/compiler/binder/binder.h"
 #include "neug/compiler/function/table/bind_data.h"
 #include "neug/compiler/function/table/bind_input.h"
 #include "neug/compiler/function/table/table_function.h"
-#include "neug/execution/common/columns/list_columns.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/common/columns/list_columns.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
+class IC14 {
+public:
 
-uint64_t pair_key(vid_t a, vid_t b) {
+static uint64_t pair_key(vid_t a, vid_t b) {
   return a > b ? (static_cast<uint64_t>(a) | (static_cast<uint64_t>(b) << 32))
                : (static_cast<uint64_t>(b) | (static_cast<uint64_t>(a) << 32));
 }
@@ -236,7 +238,7 @@ class IC14Scorer {
   CsrView comment_reply_comment_in_;
 };
 
-void bfs_layer(const CsrView& out_view, const CsrView& in_view, int8_t depth,
+static void bfs_layer(const CsrView& out_view, const CsrView& in_view, int8_t depth,
                std::queue<vid_t>* curr, std::queue<vid_t>* next,
                std::vector<int8_t>* dist0, const std::vector<int8_t>& dist1,
                std::vector<vid_t>* meet_points) {
@@ -268,7 +270,7 @@ void bfs_layer(const CsrView& out_view, const CsrView& in_view, int8_t depth,
   }
 }
 
-void dfs_paths(const CsrView& out_view, const CsrView& in_view, vid_t src,
+static void dfs_paths(const CsrView& out_view, const CsrView& in_view, vid_t src,
                vid_t dst, const std::vector<int8_t>& dist_from_src,
                const std::vector<bool>& on_path, std::vector<vid_t>* path,
                std::vector<std::vector<vid_t>>* paths) {
@@ -295,7 +297,7 @@ void dfs_paths(const CsrView& out_view, const CsrView& in_view, vid_t src,
   path->pop_back();
 }
 
-std::vector<int> score_paths(const StorageReadInterface& graph,
+static std::vector<int> score_paths(const StorageReadInterface& graph,
                              label_t person_label, label_t post_label,
                              label_t comment_label, label_t has_creator_label,
                              label_t reply_of_label,
@@ -379,7 +381,7 @@ std::vector<int> score_paths(const StorageReadInterface& graph,
   return scores;
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic14(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -393,12 +395,11 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic14(
   return input;
 }
 
-execution::Context exec_ic14(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface,
-                             const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                             IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC14FuncInput&>(input);
-  const int64_t person1_id = params.at("person1Id").GetValue<int64_t>();
-  const int64_t person2_id = params.at("person2Id").GetValue<int64_t>();
+  const int64_t person1_id = args.person1_id;
+  const int64_t person2_id = args.person2_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -413,9 +414,9 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
 
   vid_t src = StorageReadInterface::kInvalidVid;
   vid_t dst = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person1_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person1_id),
                             src) ||
-      !graph.GetVertexIndex(person_label, execution::Value::INT64(person2_id),
+      !graph.GetVertexIndex(person_label, Value::INT64(person2_id),
                             dst)) {
     return execution::Context{};
   }
@@ -536,40 +537,44 @@ execution::Context exec_ic14(const function::CallFuncInputBase& input,
   std::sort(order.begin(), order.end(),
             [&](size_t a, size_t b) { return scores[a] > scores[b]; });
 
-  execution::ListColumnBuilder path_ids_builder(DataType(DataTypeId::kInt64));
-  execution::ValueColumnBuilder<double> weight_builder;
+  ListColumnBuilder path_ids_builder(DataType(DataTypeId::kInt64));
+  ValueColumnBuilder<double> weight_builder;
 
   for (size_t idx : order) {
-    std::vector<execution::Value> ids;
+    std::vector<Value> ids;
     ids.reserve(paths[idx].size());
     for (vid_t v : paths[idx]) {
-      ids.emplace_back(execution::Value::INT64(
+      ids.emplace_back(Value::INT64(
           person_id_col->get_view(v)));
     }
     path_ids_builder.push_back_elem(
-        execution::Value::LIST(DataType(DataTypeId::kInt64), std::move(ids)));
+        Value::LIST(DataType(DataTypeId::kInt64), std::move(ids)));
     weight_builder.push_back_opt(static_cast<double>(scores[idx]) / 2.0);
   }
 
-  return ldbc::make_output_context(
-      args.output_aliases,
-      {path_ids_builder.finish(), weight_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, path_ids_builder.finish());
+  chunk.set(1, weight_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC14Function::getFunctionSet() {
   const auto person_ids_in_path_type =
       common::DataType::List(common::DataType(common::DataTypeId::kInt64));
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC14Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"personIdsInPath", person_ids_in_path_type},
           {"pathWeight", common::DataType(common::DataTypeId::kDouble)}});
-  fn->bindFunc = bind_ic14;
-  fn->execFunc = exec_ic14;
+  fn->bindFunc = IC14::bind;
+  fn->execFunc = IC14::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

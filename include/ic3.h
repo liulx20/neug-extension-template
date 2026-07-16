@@ -30,11 +30,25 @@ namespace neug {
 namespace extension {
 namespace ldbc_ic {
 
-struct IC3FuncInput : ldbc::LdbcCallInput {};
+struct IC3FuncInput : ldbc::LdbcCallInput {
+  int64_t person_id;
+  std::string country_x_name;
+  std::string country_y_name;
+  int64_t start_date_ms;
+  int64_t duration_days;
+
+  void bindParams(const execution::ParamsMap& params) override {
+    person_id = params.at("personId").GetValue<int64_t>();
+    country_x_name = params.at("countryXName").GetValue<std::string>();
+    country_y_name = params.at("countryYName").GetValue<std::string>();
+    start_date_ms = params.at("startDate").GetValue<int64_t>();
+    duration_days = params.at("durationDays").GetValue<int64_t>();
+  }
+};
+
 
 struct IC3Function {
   static constexpr const char* name = "ic3";
-
   static function::function_set getFunctionSet();
 };
 

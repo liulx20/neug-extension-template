@@ -17,27 +17,25 @@
 #include "is3.h"
 
 #include <algorithm>
-#include <array>
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kNumOutputColumns = 4;
-
+class IS3 {
+public:
 struct FriendInfo {
   vid_t person_vid = 0;
   int64_t person_id = 0;
   int64_t friendship_creation_ms = 0;
 };
 
-std::unique_ptr<function::CallFuncInputBase> bind_is3(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -47,11 +45,10 @@ std::unique_ptr<function::CallFuncInputBase> bind_is3(
   return input;
 }
 
-execution::Context exec_is3(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& is3_input = dynamic_cast<const IS3FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t person_id = is3_input.person_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -63,12 +60,10 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
   auto last_name_col = ldbc::get_vertex_column<std::string_view>(
       graph, person_label, "lastName");
   auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
-  if (!first_name_col || !last_name_col) {
-    THROW_RUNTIME_ERROR("is3: failed to load required LDBC property columns");
-  }
+
 
   vid_t person_vid = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             person_vid)) {
     return execution::Context{};
   }
@@ -103,10 +98,10 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
               return lhs.person_id < rhs.person_id;
             });
 
-  execution::ValueColumnBuilder<int64_t> person_id_builder;
-  execution::ValueColumnBuilder<std::string> first_name_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ValueColumnBuilder<DateTime> friendship_date_builder;
+  ValueColumnBuilder<int64_t> person_id_builder;
+  ValueColumnBuilder<std::string> first_name_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ValueColumnBuilder<DateTime> friendship_date_builder;
   person_id_builder.reserve(friends.size());
   first_name_builder.reserve(friends.size());
   last_name_builder.reserve(friends.size());
@@ -122,31 +117,30 @@ execution::Context exec_is3(const function::CallFuncInputBase& input,
         DateTime(friend_info.friendship_creation_ms));
   }
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = person_id_builder.finish();
-  output_columns[1] = first_name_builder.finish();
-  output_columns[2] = last_name_builder.finish();
-  output_columns[3] = friendship_date_builder.finish();
-
-  return ldbc::make_output_context(is3_input.output_aliases,
-                                   {output_columns[0], output_columns[1],
-                                    output_columns[2], output_columns[3]});
+  execution::ContextChunk chunk;
+  chunk.set(0, person_id_builder.finish());
+  chunk.set(1, first_name_builder.finish());
+  chunk.set(2, last_name_builder.finish());
+  chunk.set(3, friendship_date_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = is3_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IS3Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS3Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"personId", common::DataType(common::DataTypeId::kInt64)},
           {"firstName", common::DataType(common::DataTypeId::kVarchar)},
           {"lastName", common::DataType(common::DataTypeId::kVarchar)},
           {"friendshipCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
-  function->bindFunc = bind_is3;
-  function->execFunc = exec_is3;
+  function->bindFunc = IS3::bind;
+  function->execFunc = IS3::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;

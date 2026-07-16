@@ -21,21 +21,23 @@
 #include <vector>
 
 #include "ldbc_common.h"
+#include "neug/execution/common/context_chunk.h"
 #include "neug/common/extra_type_info.h"
 #include "neug/compiler/binder/binder.h"
 #include "neug/compiler/function/table/bind_data.h"
 #include "neug/compiler/function/table/bind_input.h"
 #include "neug/compiler/function/table/table_function.h"
-#include "neug/execution/common/columns/list_columns.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/common/columns/list_columns.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
 constexpr size_t kTopN = 20;
+class IC12 {
+public:
+
 
 struct PersonResult {
   int reply_count = 0;
@@ -55,7 +57,7 @@ struct PersonResultComparer {
   }
 };
 
-void collect_tags_in_class(const StorageReadInterface& graph,
+static void collect_tags_in_class(const StorageReadInterface& graph,
                            label_t tag_class_label, label_t tag_label,
                            label_t has_type_label, label_t is_subclass_of_label,
                            vid_t tag_class_vid, std::vector<uint8_t>* tag_set) {
@@ -81,7 +83,7 @@ void collect_tags_in_class(const StorageReadInterface& graph,
   }
 }
 
-std::unique_ptr<function::CallFuncInputBase> bind_ic12(
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   auto input = std::make_unique<IC12FuncInput>();
@@ -89,13 +91,12 @@ std::unique_ptr<function::CallFuncInputBase> bind_ic12(
   return input;
 }
 
-execution::Context exec_ic12(const function::CallFuncInputBase& input,
-                             IStorageInterface& graph_iface,
-                             const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                             IStorageInterface& graph_iface) {
   const auto& args = dynamic_cast<const IC12FuncInput&>(input);
-  const int64_t person_id = params.at("personId").GetValue<int64_t>();
+  const int64_t person_id = args.person_id;
   const std::string tag_class_name =
-      params.at("tagClassName").GetValue<std::string>();
+      args.tag_class_name;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -123,7 +124,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
   }
 
   vid_t root = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, execution::Value::INT64(person_id),
+  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
                             root)) {
     return execution::Context{};
   }
@@ -166,7 +167,7 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
             }
           }
         }
-        
+
         if (count == 0) {
           return;
         }
@@ -205,12 +206,12 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
     pq.pop();
   }
 
-  execution::ValueColumnBuilder<int64_t> person_id_builder;
-  execution::ValueColumnBuilder<std::string> first_name_builder;
-  execution::ValueColumnBuilder<std::string> last_name_builder;
-  execution::ListColumnBuilder tag_names_builder(
+  ValueColumnBuilder<int64_t> person_id_builder;
+  ValueColumnBuilder<std::string> first_name_builder;
+  ValueColumnBuilder<std::string> last_name_builder;
+  ListColumnBuilder tag_names_builder(
       DataType(DataTypeId::kVarchar));
-  execution::ValueColumnBuilder<int32_t> reply_count_builder;
+  ValueColumnBuilder<int32_t> reply_count_builder;
 
   for (size_t i = results.size(); i > 0; --i) {
     const auto& row = results[i - 1];
@@ -230,46 +231,51 @@ execution::Context exec_ic12(const function::CallFuncInputBase& input,
       }
       const auto tags = post_has_tag_out.get_edges(post_vid);
       for (auto tit = tags.begin(); tit != tags.end(); ++tit) {
-        if (*tit < tag_set.size() && tag_set[*tit]) {
+        if (tag_set[*tit]) {
           distinct_tags.insert(*tit);
         }
       }
     }
-    std::vector<execution::Value> tag_values;
+    std::vector<Value> tag_values;
     tag_values.reserve(distinct_tags.size());
     for (vid_t tag_vid : distinct_tags) {
-      tag_values.emplace_back(execution::Value::STRING(
+      tag_values.emplace_back(Value::STRING(
           std::string(tag_name_col->get_view(tag_vid))));
     }
-    tag_names_builder.push_back_elem(execution::Value::LIST(
+    tag_names_builder.push_back_elem(Value::LIST(
         DataType(DataTypeId::kVarchar), std::move(tag_values)));
     reply_count_builder.push_back_opt(row.reply_count);
   }
 
-  return ldbc::make_output_context(
-      args.output_aliases,
-      {person_id_builder.finish(), first_name_builder.finish(),
-       last_name_builder.finish(), tag_names_builder.finish(),
-       reply_count_builder.finish()});
+  execution::ContextChunk chunk;
+  chunk.set(0, person_id_builder.finish());
+  chunk.set(1, first_name_builder.finish());
+  chunk.set(2, last_name_builder.finish());
+  chunk.set(3, tag_names_builder.finish());
+  chunk.set(4, reply_count_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = args.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IC12Function::getFunctionSet() {
   const auto tag_names_list_type =
       common::DataType::List(common::DataType(common::DataTypeId::kVarchar));
   auto fn = std::make_unique<function::NeugCallFunction>(
       IC12Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64,
-                                      common::DataTypeId::kVarchar},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64),
+                                      common::DataType(common::DataTypeId::kVarchar)},
       function::call_output_columns{
           {"personId", common::DataType(common::DataTypeId::kInt64)},
           {"personFirstName", common::DataType(common::DataTypeId::kVarchar)},
           {"personLastName", common::DataType(common::DataTypeId::kVarchar)},
           {"tagNames", tag_names_list_type},
           {"replyCount", common::DataType(common::DataTypeId::kInt32)}});
-  fn->bindFunc = bind_ic12;
-  fn->execFunc = exec_ic12;
+  fn->bindFunc = IC12::bind;
+  fn->execFunc = IC12::exec;
   function::function_set set;
   set.push_back(std::move(fn));
   return set;

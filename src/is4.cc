@@ -16,20 +16,18 @@
 
 #include "is4.h"
 
-#include <array>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
+#include "neug/common/columns/value_columns.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
 namespace ldbc_ic {
-namespace {
-
-constexpr size_t kNumOutputColumns = 2;
-
-std::unique_ptr<function::CallFuncInputBase> bind_is4(
+class IS4 {
+public:
+static std::unique_ptr<function::CallFuncInputBase> bind(
     const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
     const ::physical::PhysicalPlan& plan, int op_idx) {
   const auto& params =
@@ -39,11 +37,10 @@ std::unique_ptr<function::CallFuncInputBase> bind_is4(
   return input;
 }
 
-execution::Context exec_is4(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface,
-                            const execution::ParamsMap& params) {
+static execution::Context exec(const function::CallFuncInputBase& input,
+                            IStorageInterface& graph_iface) {
   const auto& is4_input = dynamic_cast<const IS4FuncInput&>(input);
-  const int64_t message_id = params.at("messageId").GetValue<int64_t>();
+  const int64_t message_id = is4_input.message_id;
   const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
   const auto& schema = graph.schema();
 
@@ -66,31 +63,31 @@ execution::Context exec_is4(const function::CallFuncInputBase& input,
   const std::string content = ldbc::message_content(
       graph, post_label, comment_label, message_vid, is_post);
 
-  execution::ValueColumnBuilder<std::string> content_builder;
-  execution::ValueColumnBuilder<DateTime> date_builder;
+  ValueColumnBuilder<std::string> content_builder;
+  ValueColumnBuilder<DateTime> date_builder;
   content_builder.push_back_opt(content);
   date_builder.push_back_opt(DateTime(creation_ms));
 
-  std::array<std::shared_ptr<execution::IContextColumn>, kNumOutputColumns>
-      output_columns;
-  output_columns[0] = content_builder.finish();
-  output_columns[1] = date_builder.finish();
-
-  return ldbc::make_output_context(is4_input.output_aliases,
-                                   {output_columns[0], output_columns[1]});
+  execution::ContextChunk chunk;
+  chunk.set(0, content_builder.finish());
+  chunk.set(1, date_builder.finish());
+  execution::Context ctx;
+  ctx.append_chunk(std::move(chunk));
+  ctx.tag_ids = is4_input.output_aliases;
+  return ctx;
 }
 
-}  // namespace
+};
 
 function::function_set IS4Function::getFunctionSet() {
   auto function = std::make_unique<function::NeugCallFunction>(
       IS4Function::name,
-      std::vector<common::DataTypeId>{common::DataTypeId::kInt64},
+      function::call_input_types{common::DataType(common::DataTypeId::kInt64)},
       function::call_output_columns{
           {"messageContent", common::DataType(common::DataTypeId::kVarchar)},
           {"messageCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
-  function->bindFunc = bind_is4;
-  function->execFunc = exec_is4;
+  function->bindFunc = IS4::bind;
+  function->execFunc = IS4::exec;
   function::function_set function_set;
   function_set.push_back(std::move(function));
   return function_set;
