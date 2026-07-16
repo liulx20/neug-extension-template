@@ -14,7 +14,7 @@ on:
       neug_ref:
         description: NeuG git ref (branch, tag, or SHA)
         required: false
-        default: main
+        default: feat/out-of-tree-extension-cmake
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' && github.sha || '' }}
@@ -22,7 +22,7 @@ concurrency:
 
 env:
   NEUG_REPOSITORY: ${{ github.event.inputs.neug_repository || 'liulx20/neug' }}
-  NEUG_REF: ${{ github.event.inputs.neug_ref || 'main' }}
+  NEUG_REF: ${{ github.event.inputs.neug_ref || 'feat/out-of-tree-extension-cmake' }}
 
 jobs:
   linux-build:

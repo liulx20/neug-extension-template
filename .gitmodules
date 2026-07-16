@@ -1,6 +1,6 @@
-# NeuG is required to build this out-of-tree extension (same pattern as duckdb/extension-template).
+# NeuG is required to build this out-of-tree extension.
 # After clone: git submodule update --init --recursive
 [submodule "neug"]
 	path = neug
 	url = https://github.com/liulx20/neug.git
-	branch = extension
+	branch = feat/out-of-tree-extension-cmake
