@@ -18,13 +18,13 @@
 #include <cstdint>
 #include <vector>
 
-#include "neug/compiler/function/function.h"
 #include "ldbc_common.h"
+#include "neug/compiler/function/function.h"
 #include "neug/compiler/function/neug_call_function.h"
 
 namespace neug {
 namespace extension {
-namespace ldbc_ic {
+namespace ldbc {
 
 struct IS3FuncInput : ldbc::LdbcCallInput {
   int64_t person_id;
@@ -39,6 +39,6 @@ struct IS3Function {
   static function::function_set getFunctionSet();
 };
 
-}  // namespace ldbc_ic
+}  // namespace ldbc
 }  // namespace extension
 }  // namespace neug

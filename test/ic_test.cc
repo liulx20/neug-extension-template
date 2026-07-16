@@ -18,33 +18,33 @@
 #include <string>
 
 #include "ic1.h"
+#include "ic10.h"
+#include "ic11.h"
+#include "ic12.h"
+#include "ic13.h"
+#include "ic14.h"
 #include "ic4.h"
 #include "ic5.h"
 #include "ic6.h"
 #include "ic7.h"
 #include "ic8.h"
 #include "ic9.h"
-#include "ic10.h"
-#include "ic11.h"
-#include "ic12.h"
-#include "ic13.h"
-#include "ic14.h"
 #include "neug/main/neug_db.h"
 #include "neug/utils/property/types.h"
 
 TEST(ICFunctions, FunctionSets) {
-  EXPECT_EQ(neug::extension::ldbc_ic::IC1Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC4Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC5Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC6Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC7Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC8Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC9Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC10Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC11Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC12Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC13Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IC14Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC1Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC4Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC5Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC6Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC7Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC8Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC9Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC10Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC11Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC12Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC13Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IC14Function::getFunctionSet().size(), 1u);
 }
 
 #ifdef WIGGLE_EXTENSION_LIB
@@ -79,7 +79,8 @@ void setup_ic_mini_graph(neug::Connection* conn) {
   run("CREATE REL TABLE ISLOCATEDIN(FROM PERSON TO PLACE, FROM ORGANISATION "
       "TO PLACE);");
   run("CREATE REL TABLE WORKAT(FROM PERSON TO ORGANISATION, workFrom INT32);");
-  run("CREATE REL TABLE STUDYAT(FROM PERSON TO ORGANISATION, classYear INT32);");
+  run("CREATE REL TABLE STUDYAT(FROM PERSON TO ORGANISATION, classYear "
+      "INT32);");
   run("CREATE REL TABLE HASMEMBER(FROM FORUM TO PERSON, joinDate TIMESTAMP);");
   run("CREATE REL TABLE CONTAINEROF(FROM FORUM TO POST);");
   run("CREATE REL TABLE LIKES(FROM PERSON TO POST, FROM PERSON TO COMMENT, "
@@ -178,7 +179,8 @@ void setup_ic_mini_graph(neug::Connection* conn) {
   run("MATCH (friend_comment:COMMENT {id:202}), (post2:POST {id:101}) "
       "CREATE (friend_comment)-[:REPLYOF]->(post2);");
   run("MATCH (friend_comment:COMMENT {id:202}), (friend:PERSON {id:2}) "
-      "CREATE (friend_comment)-[:HASCREATOR {creationDate: timestamp('2012-06-22 "
+      "CREATE (friend_comment)-[:HASCREATOR {creationDate: "
+      "timestamp('2012-06-22 "
       "00:00:00.000')}]->(friend);");
   run("MATCH (forum:FORUM {id:20}), (friend:PERSON {id:2}) "
       "CREATE (forum)-[:HASMEMBER {joinDate: timestamp('2012-09-10 "
@@ -226,10 +228,11 @@ TEST(ICFunctions, CallSmokeTests) {
   EXPECT_EQ(ic1_res->GetString(2), "B");
   EXPECT_EQ(ic1_res->GetString(3), "Zurich");
 
-  auto ic4_res = conn->Query(
-      "CALL ic4(1, " + std::to_string(start_ms) + ", 28) "
-      "YIELD tagName, postCount RETURN tagName, postCount",
-      "read");
+  auto ic4_res =
+      conn->Query("CALL ic4(1, " + std::to_string(start_ms) +
+                      ", 28) "
+                      "YIELD tagName, postCount RETURN tagName, postCount",
+                  "read");
   ASSERT_TRUE(ic4_res.has_value()) << ic4_res.error().ToString();
   ASSERT_EQ(ic4_res->length(), 3u);
   ic4_res->Reset();
@@ -245,8 +248,9 @@ TEST(ICFunctions, CallSmokeTests) {
   const int64_t min_date_ms =
       neug::DateTime("2012-09-02 00:00:00.000").milli_second;
   auto ic5_res = conn->Query(
-      "CALL ic5(1, " + std::to_string(min_date_ms) + ") "
-      "YIELD forumTitle, postCount RETURN forumTitle, postCount",
+      "CALL ic5(1, " + std::to_string(min_date_ms) +
+          ") "
+          "YIELD forumTitle, postCount RETURN forumTitle, postCount",
       "read");
   ASSERT_TRUE(ic5_res.has_value()) << ic5_res.error().ToString();
   ASSERT_EQ(ic5_res->length(), 1u);
@@ -297,10 +301,11 @@ TEST(ICFunctions, CallSmokeTests) {
 
   const int64_t max_date_ms =
       neug::DateTime("2012-07-01 00:00:00.000").milli_second;
-  auto ic9_res = conn->Query(
-      "CALL ic9(1, " + std::to_string(max_date_ms) + ") "
-      "YIELD personId, messageId RETURN personId, messageId",
-      "read");
+  auto ic9_res =
+      conn->Query("CALL ic9(1, " + std::to_string(max_date_ms) +
+                      ") "
+                      "YIELD personId, messageId RETURN personId, messageId",
+                  "read");
   ASSERT_TRUE(ic9_res.has_value()) << ic9_res.error().ToString();
   ASSERT_GE(ic9_res->length(), 1u);
   ic9_res->Reset();
@@ -350,8 +355,8 @@ TEST(ICFunctions, CallSmokeTests) {
   ASSERT_TRUE(ic13_res->hasNext());
   EXPECT_EQ(ic13_res->GetInt32(0), 1);
 
-  auto ic14_res = conn->Query(
-      "CALL ic14(1, 2) YIELD pathWeight RETURN pathWeight", "read");
+  auto ic14_res =
+      conn->Query("CALL ic14(1, 2) YIELD pathWeight RETURN pathWeight", "read");
   ASSERT_TRUE(ic14_res.has_value()) << ic14_res.error().ToString();
   ASSERT_GE(ic14_res->length(), 1u);
 

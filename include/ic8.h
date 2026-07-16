@@ -18,13 +18,13 @@
 #include <cstdint>
 #include <vector>
 
-#include "neug/compiler/function/function.h"
 #include "ldbc_common.h"
+#include "neug/compiler/function/function.h"
 #include "neug/compiler/function/neug_call_function.h"
 
 namespace neug {
 namespace extension {
-namespace ldbc_ic {
+namespace ldbc {
 
 struct IC8FuncInput : ldbc::LdbcCallInput {
   int64_t person_id;
@@ -34,12 +34,11 @@ struct IC8FuncInput : ldbc::LdbcCallInput {
   }
 };
 
-
 struct IC8Function {
   static constexpr const char* name = "ic8";
   static function::function_set getFunctionSet();
 };
 
-}  // namespace ldbc_ic
+}  // namespace ldbc
 }  // namespace extension
 }  // namespace neug

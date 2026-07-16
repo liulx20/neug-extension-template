@@ -28,13 +28,13 @@
 #include "neug/utils/property/types.h"
 
 TEST(ISFunctions, FunctionSets) {
-  EXPECT_EQ(neug::extension::ldbc_ic::IS1Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IS2Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IS3Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IS4Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IS5Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IS6Function::getFunctionSet().size(), 1u);
-  EXPECT_EQ(neug::extension::ldbc_ic::IS7Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IS1Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IS2Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IS3Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IS4Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IS5Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IS6Function::getFunctionSet().size(), 1u);
+  EXPECT_EQ(neug::extension::ldbc::IS7Function::getFunctionSet().size(), 1u);
 }
 
 #ifdef WIGGLE_EXTENSION_LIB

@@ -26,7 +26,7 @@ void Init();
 }
 
 TEST(IC3Function, FunctionSet) {
-  auto function_set = neug::extension::ldbc_ic::IC3Function::getFunctionSet();
+  auto function_set = neug::extension::ldbc::IC3Function::getFunctionSet();
   ASSERT_EQ(function_set.size(), 1u);
   EXPECT_EQ(function_set[0]->name, "ic3");
   auto* call_func =
@@ -45,7 +45,8 @@ void setup_ic3_mini_graph(neug::Connection* conn) {
   };
   run("CREATE NODE TABLE PERSON(id INT64, firstName STRING, lastName STRING, "
       "PRIMARY KEY(id));");
-  run("CREATE NODE TABLE POST(id INT64, content STRING, creationDate TIMESTAMP, "
+  run("CREATE NODE TABLE POST(id INT64, content STRING, creationDate "
+      "TIMESTAMP, "
       "PRIMARY KEY(id));");
   run("CREATE NODE TABLE COMMENT(id INT64, content STRING, creationDate "
       "TIMESTAMP, PRIMARY KEY(id));");
@@ -96,7 +97,8 @@ TEST(IC3Function, CallWithLiteralArgs) {
       neug::DateTime("2010-12-01 00:00:00.000").milli_second;
   auto ic3_res = conn->Query(
       "CALL ic3(1, 'Puerto_Rico', 'Republic_of_Macedonia', " +
-          std::to_string(start_date_ms) + ", 30) "
+          std::to_string(start_date_ms) +
+          ", 30) "
           "YIELD personId, personFirstName, personLastName, countryXCount, "
           "countryYCount, totalCount "
           "RETURN personId, personFirstName, personLastName, countryXCount, "

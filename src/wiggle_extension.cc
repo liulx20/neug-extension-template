@@ -52,27 +52,27 @@ namespace {
       neug::catalog::CatalogEntryType::TABLE_FUNCTION_ENTRY)
 
 void register_ldbc_functions() {
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC1Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC2Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC3Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC4Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC5Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC6Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC7Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC8Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC9Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC10Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC11Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC12Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC13Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IC14Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IS1Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IS2Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IS3Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IS4Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IS5Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IS6Function);
-  REGISTER_TABLE_FUNC(neug::extension::ldbc_ic::IS7Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC1Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC2Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC3Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC4Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC5Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC6Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC7Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC8Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC9Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC10Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC11Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC12Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC13Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IC14Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IS1Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IS2Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IS3Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IS4Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IS5Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IS6Function);
+  REGISTER_TABLE_FUNC(neug::extension::ldbc::IS7Function);
 }
 
 }  // namespace

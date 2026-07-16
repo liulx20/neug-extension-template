@@ -19,15 +19,15 @@
 #include <memory>
 #include <vector>
 
-#include "neug/compiler/function/function.h"
 #include "ldbc_common.h"
+#include "neug/compiler/function/function.h"
 #include "neug/compiler/function/neug_call_function.h"
 #include "neug/execution/common/context.h"
 #include "neug/storages/graph/graph_interface.h"
 
 namespace neug {
 namespace extension {
-namespace ldbc_ic {
+namespace ldbc {
 
 struct IC2FuncInput : ldbc::LdbcCallInput {
   int64_t person_id;
@@ -39,12 +39,11 @@ struct IC2FuncInput : ldbc::LdbcCallInput {
   }
 };
 
-
 struct IC2Function {
   static constexpr const char* name = "ic2";
   static function::function_set getFunctionSet();
 };
 
-}  // namespace ldbc_ic
+}  // namespace ldbc
 }  // namespace extension
 }  // namespace neug

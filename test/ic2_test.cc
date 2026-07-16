@@ -26,7 +26,7 @@ void Init();
 }
 
 TEST(IC2Function, FunctionSet) {
-  auto function_set = neug::extension::ldbc_ic::IC2Function::getFunctionSet();
+  auto function_set = neug::extension::ldbc::IC2Function::getFunctionSet();
   ASSERT_EQ(function_set.size(), 1u);
   EXPECT_EQ(function_set[0]->name, "ic2");
   auto* call_func =
@@ -83,11 +83,12 @@ TEST(IC2Function, CallWithLiteralMillis) {
   const int64_t max_date_ms =
       neug::DateTime("2012-04-11 00:00:00.000").milli_second;
   auto ic2_res = conn->Query(
-      "CALL ic2(1, " + std::to_string(max_date_ms) + ") "
-      "YIELD personId, personFirstName, personLastName, messageId, "
-      "messageContent, messageCreationDate "
-      "RETURN personId, personFirstName, personLastName, messageId, "
-      "messageContent, messageCreationDate",
+      "CALL ic2(1, " + std::to_string(max_date_ms) +
+          ") "
+          "YIELD personId, personFirstName, personLastName, messageId, "
+          "messageContent, messageCreationDate "
+          "RETURN personId, personFirstName, personLastName, messageId, "
+          "messageContent, messageCreationDate",
       "read");
   ASSERT_TRUE(ic2_res.has_value()) << ic2_res.error().ToString();
   ASSERT_EQ(ic2_res->length(), 1u);

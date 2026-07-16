@@ -20,114 +20,112 @@
 #include <vector>
 
 #include "ldbc_common.h"
-#include "neug/execution/common/context_chunk.h"
 #include "neug/common/columns/value_columns.h"
+#include "neug/execution/common/context_chunk.h"
 #include "neug/utils/exception/exception.h"
 
 namespace neug {
 namespace extension {
-namespace ldbc_ic {
+namespace ldbc {
 class IS3 {
-public:
-struct FriendInfo {
-  vid_t person_vid = 0;
-  int64_t person_id = 0;
-  int64_t friendship_creation_ms = 0;
-};
-
-static std::unique_ptr<function::CallFuncInputBase> bind(
-    const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
-    const ::physical::PhysicalPlan& plan, int op_idx) {
-  const auto& params =
-      plan.plan(op_idx).opr().procedure_call().query().arguments();
-  auto input = std::make_unique<IS3FuncInput>();
-  ldbc::bind_ldbc_call(plan, op_idx, input.get());
-  return input;
-}
-
-static execution::Context exec(const function::CallFuncInputBase& input,
-                            IStorageInterface& graph_iface) {
-  const auto& is3_input = dynamic_cast<const IS3FuncInput&>(input);
-  const int64_t person_id = is3_input.person_id;
-  const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
-  const auto& schema = graph.schema();
-
-  const label_t person_label = schema.get_vertex_label_id("PERSON");
-  const label_t knows_label = schema.get_edge_label_id("KNOWS");
-
-  auto first_name_col = ldbc::get_vertex_column<std::string_view>(
-      graph, person_label, "firstName");
-  auto last_name_col = ldbc::get_vertex_column<std::string_view>(
-      graph, person_label, "lastName");
-  auto person_id_col = ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
-
-
-  vid_t person_vid = StorageReadInterface::kInvalidVid;
-  if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
-                            person_vid)) {
-    return execution::Context{};
-  }
-
-  const auto out_view = graph.GetGenericOutgoingGraphView(
-      person_label, person_label, knows_label);
-  const auto in_view = graph.GetGenericIncomingGraphView(
-      person_label, person_label, knows_label);
-  const auto edge_accessor = graph.GetEdgeDataAccessor(
-      person_label, person_label, knows_label, "creationDate");
-
-  std::vector<FriendInfo> friends;
-  auto collect = [&](const CsrView& view, vid_t root) {
-    for (auto it = view.get_edges(root).begin();
-         it != view.get_edges(root).end(); ++it) {
-      FriendInfo info;
-      info.person_vid = *it;
-      info.person_id = person_id_col->get_view(info.person_vid);
-      info.friendship_creation_ms =
-          edge_accessor.get_typed_data<DateTime>(it).milli_second;
-      friends.push_back(info);
-    }
+ public:
+  struct FriendInfo {
+    vid_t person_vid = 0;
+    int64_t person_id = 0;
+    int64_t friendship_creation_ms = 0;
   };
-  collect(out_view, person_vid);
-  collect(in_view, person_vid);
 
-  std::sort(friends.begin(), friends.end(),
-            [](const FriendInfo& lhs, const FriendInfo& rhs) {
-              if (lhs.friendship_creation_ms != rhs.friendship_creation_ms) {
-                return lhs.friendship_creation_ms > rhs.friendship_creation_ms;
-              }
-              return lhs.person_id < rhs.person_id;
-            });
-
-  ValueColumnBuilder<int64_t> person_id_builder;
-  ValueColumnBuilder<std::string> first_name_builder;
-  ValueColumnBuilder<std::string> last_name_builder;
-  ValueColumnBuilder<DateTime> friendship_date_builder;
-  person_id_builder.reserve(friends.size());
-  first_name_builder.reserve(friends.size());
-  last_name_builder.reserve(friends.size());
-  friendship_date_builder.reserve(friends.size());
-
-  for (const auto& friend_info : friends) {
-    person_id_builder.push_back_opt(friend_info.person_id);
-    first_name_builder.push_back_opt(
-        std::string(first_name_col->get_view(friend_info.person_vid)));
-    last_name_builder.push_back_opt(
-        std::string(last_name_col->get_view(friend_info.person_vid)));
-    friendship_date_builder.push_back_opt(
-        DateTime(friend_info.friendship_creation_ms));
+  static std::unique_ptr<function::CallFuncInputBase> bind(
+      const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
+      const ::physical::PhysicalPlan& plan, int op_idx) {
+    auto input = std::make_unique<IS3FuncInput>();
+    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    return input;
   }
 
-  execution::ContextChunk chunk;
-  chunk.set(0, person_id_builder.finish());
-  chunk.set(1, first_name_builder.finish());
-  chunk.set(2, last_name_builder.finish());
-  chunk.set(3, friendship_date_builder.finish());
-  execution::Context ctx;
-  ctx.append_chunk(std::move(chunk));
-  ctx.tag_ids = is3_input.output_aliases;
-  return ctx;
-}
+  static execution::Context exec(const function::CallFuncInputBase& input,
+                                 IStorageInterface& graph_iface) {
+    const auto& is3_input = dynamic_cast<const IS3FuncInput&>(input);
+    const int64_t person_id = is3_input.person_id;
+    const auto& graph = dynamic_cast<const StorageReadInterface&>(graph_iface);
+    const auto& schema = graph.schema();
 
+    const label_t person_label = schema.get_vertex_label_id("PERSON");
+    const label_t knows_label = schema.get_edge_label_id("KNOWS");
+
+    auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+        graph, person_label, "firstName");
+    auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+        graph, person_label, "lastName");
+    auto person_id_col =
+        ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
+
+    vid_t person_vid = StorageReadInterface::kInvalidVid;
+    if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
+                              person_vid)) {
+      return execution::Context{};
+    }
+
+    const auto out_view = graph.GetGenericOutgoingGraphView(
+        person_label, person_label, knows_label);
+    const auto in_view = graph.GetGenericIncomingGraphView(
+        person_label, person_label, knows_label);
+    const auto edge_accessor = graph.GetEdgeDataAccessor(
+        person_label, person_label, knows_label, "creationDate");
+
+    std::vector<FriendInfo> friends;
+    auto collect = [&](const CsrView& view, vid_t root) {
+      for (auto it = view.get_edges(root).begin();
+           it != view.get_edges(root).end(); ++it) {
+        FriendInfo info;
+        info.person_vid = *it;
+        info.person_id = person_id_col->get_view(info.person_vid);
+        info.friendship_creation_ms =
+            edge_accessor.get_typed_data<DateTime>(it).milli_second;
+        friends.push_back(info);
+      }
+    };
+    collect(out_view, person_vid);
+    collect(in_view, person_vid);
+
+    std::sort(friends.begin(), friends.end(),
+              [](const FriendInfo& lhs, const FriendInfo& rhs) {
+                if (lhs.friendship_creation_ms != rhs.friendship_creation_ms) {
+                  return lhs.friendship_creation_ms >
+                         rhs.friendship_creation_ms;
+                }
+                return lhs.person_id < rhs.person_id;
+              });
+
+    ValueColumnBuilder<int64_t> person_id_builder;
+    ValueColumnBuilder<std::string> first_name_builder;
+    ValueColumnBuilder<std::string> last_name_builder;
+    ValueColumnBuilder<DateTime> friendship_date_builder;
+    person_id_builder.reserve(friends.size());
+    first_name_builder.reserve(friends.size());
+    last_name_builder.reserve(friends.size());
+    friendship_date_builder.reserve(friends.size());
+
+    for (const auto& friend_info : friends) {
+      person_id_builder.push_back_opt(friend_info.person_id);
+      first_name_builder.push_back_opt(
+          std::string(first_name_col->get_view(friend_info.person_vid)));
+      last_name_builder.push_back_opt(
+          std::string(last_name_col->get_view(friend_info.person_vid)));
+      friendship_date_builder.push_back_opt(
+          DateTime(friend_info.friendship_creation_ms));
+    }
+
+    execution::ContextChunk chunk;
+    chunk.set(0, person_id_builder.finish());
+    chunk.set(1, first_name_builder.finish());
+    chunk.set(2, last_name_builder.finish());
+    chunk.set(3, friendship_date_builder.finish());
+    execution::Context ctx;
+    ctx.append_chunk(std::move(chunk));
+    ctx.tag_ids = is3_input.output_aliases;
+    return ctx;
+  }
 };
 
 function::function_set IS3Function::getFunctionSet() {
@@ -138,7 +136,8 @@ function::function_set IS3Function::getFunctionSet() {
           {"personId", common::DataType(common::DataTypeId::kInt64)},
           {"firstName", common::DataType(common::DataTypeId::kVarchar)},
           {"lastName", common::DataType(common::DataTypeId::kVarchar)},
-          {"friendshipCreationDate", common::DataType(common::DataTypeId::kTimestampMs)}});
+          {"friendshipCreationDate",
+           common::DataType(common::DataTypeId::kTimestampMs)}});
   function->bindFunc = IS3::bind;
   function->execFunc = IS3::exec;
   function::function_set function_set;
@@ -146,6 +145,6 @@ function::function_set IS3Function::getFunctionSet() {
   return function_set;
 }
 
-}  // namespace ldbc_ic
+}  // namespace ldbc
 }  // namespace extension
 }  // namespace neug
