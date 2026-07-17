@@ -39,14 +39,13 @@ struct IC3FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IC3FuncInput& in, const execution::ParamsMap& p) {
-          in.person_id = p.at("personId").GetValue<int64_t>();
-          in.country_x_name = p.at("countryXName").GetValue<std::string>();
-          in.country_y_name = p.at("countryYName").GetValue<std::string>();
-          in.start_date_ms = p.at("startDate").GetValue<int64_t>();
-          in.duration_days = p.at("durationDays").GetValue<int64_t>();
-        });
+    auto bound = std::make_unique<IC3FuncInput>(*this);
+    bound->person_id = params.at("personId").GetValue<int64_t>();
+    bound->country_x_name = params.at("countryXName").GetValue<std::string>();
+    bound->country_y_name = params.at("countryYName").GetValue<std::string>();
+    bound->start_date_ms = params.at("startDate").GetValue<int64_t>();
+    bound->duration_days = params.at("durationDays").GetValue<int64_t>();
+    return bound;
   }
 };
 

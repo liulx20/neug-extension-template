@@ -36,16 +36,6 @@ struct LdbcCallInput : function::CallFuncInputBase {
   std::vector<int> output_aliases;
 };
 
-// Copy unbound template and fill deferred $params into a per-Eval input.
-template <typename InputT, typename Filler>
-std::unique_ptr<function::CallFuncInputBase> bind_call_params(
-    const InputT& unbound, const execution::ParamsMap& params,
-    Filler&& filler) {
-  auto bound = std::make_unique<InputT>(unbound);
-  std::forward<Filler>(filler)(*bound, params);
-  return bound;
-}
-
 void bind_ldbc_call(const ::physical::PhysicalPlan& plan, int op_idx,
                     LdbcCallInput* input);
 

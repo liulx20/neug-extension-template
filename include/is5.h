@@ -32,10 +32,9 @@ struct IS5FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IS5FuncInput& in, const execution::ParamsMap& p) {
-          in.message_id = p.at("messageId").GetValue<int64_t>();
-        });
+    auto bound = std::make_unique<IS5FuncInput>(*this);
+    bound->message_id = params.at("messageId").GetValue<int64_t>();
+    return bound;
   }
 };
 

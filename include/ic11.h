@@ -35,12 +35,11 @@ struct IC11FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IC11FuncInput& in, const execution::ParamsMap& p) {
-          in.person_id = p.at("personId").GetValue<int64_t>();
-          in.country_name = p.at("countryName").GetValue<std::string>();
-          in.work_from_year = p.at("workFromYear").GetValue<int32_t>();
-        });
+    auto bound = std::make_unique<IC11FuncInput>(*this);
+    bound->person_id = params.at("personId").GetValue<int64_t>();
+    bound->country_name = params.at("countryName").GetValue<std::string>();
+    bound->work_from_year = params.at("workFromYear").GetValue<int32_t>();
+    return bound;
   }
 };
 

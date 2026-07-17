@@ -33,11 +33,10 @@ struct IC5FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IC5FuncInput& in, const execution::ParamsMap& p) {
-          in.person_id = p.at("personId").GetValue<int64_t>();
-          in.min_date_ms = p.at("minDate").GetValue<int64_t>();
-        });
+    auto bound = std::make_unique<IC5FuncInput>(*this);
+    bound->person_id = params.at("personId").GetValue<int64_t>();
+    bound->min_date_ms = params.at("minDate").GetValue<int64_t>();
+    return bound;
   }
 };
 

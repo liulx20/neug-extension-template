@@ -34,11 +34,10 @@ struct IC12FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IC12FuncInput& in, const execution::ParamsMap& p) {
-          in.person_id = p.at("personId").GetValue<int64_t>();
-          in.tag_class_name = p.at("tagClassName").GetValue<std::string>();
-        });
+    auto bound = std::make_unique<IC12FuncInput>(*this);
+    bound->person_id = params.at("personId").GetValue<int64_t>();
+    bound->tag_class_name = params.at("tagClassName").GetValue<std::string>();
+    return bound;
   }
 };
 

@@ -32,10 +32,9 @@ struct IS3FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IS3FuncInput& in, const execution::ParamsMap& p) {
-          in.person_id = p.at("personId").GetValue<int64_t>();
-        });
+    auto bound = std::make_unique<IS3FuncInput>(*this);
+    bound->person_id = params.at("personId").GetValue<int64_t>();
+    return bound;
   }
 };
 

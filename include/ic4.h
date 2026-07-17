@@ -34,12 +34,11 @@ struct IC4FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IC4FuncInput& in, const execution::ParamsMap& p) {
-          in.person_id = p.at("personId").GetValue<int64_t>();
-          in.start_date_ms = p.at("startDate").GetValue<int64_t>();
-          in.duration_days = p.at("durationDays").GetValue<int64_t>();
-        });
+    auto bound = std::make_unique<IC4FuncInput>(*this);
+    bound->person_id = params.at("personId").GetValue<int64_t>();
+    bound->start_date_ms = params.at("startDate").GetValue<int64_t>();
+    bound->duration_days = params.at("durationDays").GetValue<int64_t>();
+    return bound;
   }
 };
 

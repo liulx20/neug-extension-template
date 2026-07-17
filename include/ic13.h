@@ -33,11 +33,10 @@ struct IC13FuncInput : ldbc::LdbcCallInput {
 
   std::unique_ptr<function::CallFuncInputBase> bindParams(
       const execution::ParamsMap& params) const override {
-    return bind_call_params(
-        *this, params, [](IC13FuncInput& in, const execution::ParamsMap& p) {
-          in.person1_id = p.at("person1Id").GetValue<int64_t>();
-          in.person2_id = p.at("person2Id").GetValue<int64_t>();
-        });
+    auto bound = std::make_unique<IC13FuncInput>(*this);
+    bound->person1_id = params.at("person1Id").GetValue<int64_t>();
+    bound->person2_id = params.at("person2Id").GetValue<int64_t>();
+    return bound;
   }
 };
 
