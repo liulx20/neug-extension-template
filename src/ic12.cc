@@ -160,6 +160,10 @@ class IC12 {
             const vid_t comment_vid = *cit;
             const vid_t post_vid = ldbc::get_single_out_neighbor(
                 comment_reply_of_post_out, comment_vid);
+            // REPLYOF may target another comment; only count replies to posts.
+            if (post_vid == StorageReadInterface::kInvalidVid) {
+              continue;
+            }
             const auto tags = post_has_tag_out.get_edges(post_vid);
             for (auto tit = tags.begin(); tit != tags.end(); ++tit) {
               if (tag_set[*tit]) {

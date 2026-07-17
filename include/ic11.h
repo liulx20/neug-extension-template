@@ -16,6 +16,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,10 +33,14 @@ struct IC11FuncInput : ldbc::LdbcCallInput {
   std::string country_name;
   int32_t work_from_year;
 
-  void bindParams(const execution::ParamsMap& params) override {
-    person_id = params.at("personId").GetValue<int64_t>();
-    country_name = params.at("countryName").GetValue<std::string>();
-    work_from_year = params.at("workFromYear").GetValue<int32_t>();
+  std::unique_ptr<function::CallFuncInputBase> bindParams(
+      const execution::ParamsMap& params) const override {
+    return bind_call_params(
+        *this, params, [](IC11FuncInput& in, const execution::ParamsMap& p) {
+          in.person_id = p.at("personId").GetValue<int64_t>();
+          in.country_name = p.at("countryName").GetValue<std::string>();
+          in.work_from_year = p.at("workFromYear").GetValue<int32_t>();
+        });
   }
 };
 

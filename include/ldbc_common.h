@@ -36,13 +36,23 @@ struct LdbcCallInput : function::CallFuncInputBase {
   std::vector<int> output_aliases;
 };
 
+// Copy unbound template and fill deferred $params into a per-Eval input.
+template <typename InputT, typename Filler>
+std::unique_ptr<function::CallFuncInputBase> bind_call_params(
+    const InputT& unbound, const execution::ParamsMap& params,
+    Filler&& filler) {
+  auto bound = std::make_unique<InputT>(unbound);
+  std::forward<Filler>(filler)(*bound, params);
+  return bound;
+}
+
 void bind_ldbc_call(const ::physical::PhysicalPlan& plan, int op_idx,
                     LdbcCallInput* input);
 
 template <typename T>
-inline std::shared_ptr<StorageReadInterface::vertex_column_t<T>> get_vertex_column(
-    const StorageReadInterface& graph, label_t label,
-    const std::string& prop_name) {
+inline std::shared_ptr<StorageReadInterface::vertex_column_t<T>>
+get_vertex_column(const StorageReadInterface& graph, label_t label,
+                  const std::string& prop_name) {
   return std::dynamic_pointer_cast<StorageReadInterface::vertex_column_t<T>>(
       graph.GetVertexPropColumn(label, prop_name));
 }
@@ -75,9 +85,9 @@ vid_t resolve_root_post(const StorageReadInterface& graph, label_t post_label,
                         label_t comment_label, label_t reply_of_label,
                         vid_t message_vid, bool is_post);
 
-std::string message_content(const StorageReadInterface& graph, label_t post_label,
-                            label_t comment_label, vid_t message_vid,
-                            bool is_post);
+std::string message_content(const StorageReadInterface& graph,
+                            label_t post_label, label_t comment_label,
+                            vid_t message_vid, bool is_post);
 
 template <typename Func>
 inline void foreach_knows_neighbor(const StorageReadInterface& graph,
@@ -142,15 +152,15 @@ inline void foreach_knows_2d_neighbor(const StorageReadInterface& graph,
 
 template <typename Func>
 inline void foreach_knows_1d_2d_neighbor(const StorageReadInterface& graph,
-                                           label_t person_label,
-                                           label_t knows_label, vid_t root,
-                                           Func&& func) {
+                                         label_t person_label,
+                                         label_t knows_label, vid_t root,
+                                         Func&& func) {
   const auto out_view = graph.GetGenericOutgoingGraphView(
       person_label, person_label, knows_label);
   const auto in_view = graph.GetGenericIncomingGraphView(
       person_label, person_label, knows_label);
 
-  //std::vector<bool> visited(graph.GetVertexSet(person_label).size(), false);
+  // std::vector<bool> visited(graph.GetVertexSet(person_label).size(), false);
   phmap::flat_hash_set<vid_t> visited;
   visited.insert(root);
   std::vector<vid_t> neighbors;
@@ -186,8 +196,9 @@ inline void foreach_knows_1d_2d_neighbor(const StorageReadInterface& graph,
 }
 
 inline void mark_knows_1d_2d_neighbors(const StorageReadInterface& graph,
-                                       label_t person_label, label_t knows_label,
-                                       vid_t root, std::vector<bool>* friends) {
+                                       label_t person_label,
+                                       label_t knows_label, vid_t root,
+                                       std::vector<bool>* friends) {
   friends->assign(graph.GetVertexSet(person_label).size(), false);
   (*friends)[root] = true;
   const auto out_view = graph.GetGenericOutgoingGraphView(
@@ -228,8 +239,8 @@ using TypedView = TypedCsrView<DateTime, CsrViewType::kMultipleMutable>;
 inline TypedView get_typed_incoming_view(const StorageReadInterface& graph,
                                          label_t dst_label, label_t src_label,
                                          label_t edge_label) {
-  const auto view = graph.GetGenericIncomingGraphView(dst_label, src_label,
-                                                      edge_label);
+  const auto view =
+      graph.GetGenericIncomingGraphView(dst_label, src_label, edge_label);
   return view.get_typed_view<DateTime, CsrViewType::kMultipleMutable>();
 }
 
@@ -257,29 +268,29 @@ template <typename Func>
 inline void foreach_incoming_nbr_between(const TypedView& view, vid_t dst_vid,
                                          int64_t min_date_ms,
                                          int64_t max_date_ms, Func&& func) {
-  foreach_incoming_nbr_lt(
-      view, dst_vid, DateTime(max_date_ms + 1),
-      [&](vid_t nbr, const DateTime& edge_data) {
-        if (edge_data.milli_second < min_date_ms) {
-          return;
-        }
-        std::forward<Func>(func)(nbr, edge_data);
-      });
+  foreach_incoming_nbr_lt(view, dst_vid, DateTime(max_date_ms + 1),
+                          [&](vid_t nbr, const DateTime& edge_data) {
+                            if (edge_data.milli_second < min_date_ms) {
+                              return;
+                            }
+                            std::forward<Func>(func)(nbr, edge_data);
+                          });
 }
 
 // Flex foreach_edges_between with an exclusive upper bound: [minDate, maxDate).
 template <typename Func>
-inline void foreach_incoming_nbr_between_half_open(
-    const TypedView& view, vid_t dst_vid, int64_t min_date_ms,
-    int64_t max_date_ms, Func&& func) {
-  foreach_incoming_nbr_lt(
-      view, dst_vid, DateTime(max_date_ms),
-      [&](vid_t nbr, const DateTime& edge_data) {
-        if (edge_data.milli_second < min_date_ms) {
-          return;
-        }
-        std::forward<Func>(func)(nbr, edge_data);
-      });
+inline void foreach_incoming_nbr_between_half_open(const TypedView& view,
+                                                   vid_t dst_vid,
+                                                   int64_t min_date_ms,
+                                                   int64_t max_date_ms,
+                                                   Func&& func) {
+  foreach_incoming_nbr_lt(view, dst_vid, DateTime(max_date_ms),
+                          [&](vid_t nbr, const DateTime& edge_data) {
+                            if (edge_data.milli_second < min_date_ms) {
+                              return;
+                            }
+                            std::forward<Func>(func)(nbr, edge_data);
+                          });
 }
 
 }  // namespace ldbc

@@ -155,7 +155,8 @@ class IC3 {
         graph, person_label, knows_label, root, [&](vid_t friend_vid) {
           const vid_t city_vid =
               ldbc::get_single_out_neighbor(person_located_in, friend_vid);
-          if (city_in_country_x_or_y[city_vid]) {
+          if (city_vid == StorageReadInterface::kInvalidVid ||
+              city_in_country_x_or_y[city_vid]) {
             return;
           }
           friends.push_back(friend_vid);

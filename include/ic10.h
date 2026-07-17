@@ -16,6 +16,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "ldbc_common.h"
@@ -30,9 +31,13 @@ struct IC10FuncInput : ldbc::LdbcCallInput {
   int64_t person_id;
   int32_t month;
 
-  void bindParams(const execution::ParamsMap& params) override {
-    person_id = params.at("personId").GetValue<int64_t>();
-    month = params.at("month").GetValue<int32_t>();
+  std::unique_ptr<function::CallFuncInputBase> bindParams(
+      const execution::ParamsMap& params) const override {
+    return bind_call_params(
+        *this, params, [](IC10FuncInput& in, const execution::ParamsMap& p) {
+          in.person_id = p.at("personId").GetValue<int64_t>();
+          in.month = p.at("month").GetValue<int32_t>();
+        });
   }
 };
 

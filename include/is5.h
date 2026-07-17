@@ -16,6 +16,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "ldbc_common.h"
@@ -29,8 +30,12 @@ namespace ldbc {
 struct IS5FuncInput : ldbc::LdbcCallInput {
   int64_t message_id;
 
-  void bindParams(const execution::ParamsMap& params) override {
-    message_id = params.at("messageId").GetValue<int64_t>();
+  std::unique_ptr<function::CallFuncInputBase> bindParams(
+      const execution::ParamsMap& params) const override {
+    return bind_call_params(
+        *this, params, [](IS5FuncInput& in, const execution::ParamsMap& p) {
+          in.message_id = p.at("messageId").GetValue<int64_t>();
+        });
   }
 };
 

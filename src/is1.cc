@@ -31,8 +31,6 @@ class IS1 {
   static std::unique_ptr<function::CallFuncInputBase> bind(
       const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
       const ::physical::PhysicalPlan& plan, int op_idx) {
-    const auto& params =
-        plan.plan(op_idx).opr().procedure_call().query().arguments();
     auto input = std::make_unique<IS1FuncInput>();
     ldbc::bind_ldbc_call(plan, op_idx, input.get());
     return input;
