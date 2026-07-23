@@ -55,9 +55,7 @@ class IS4 {
     auto creation_date_col =
         ldbc::get_vertex_column<DateTime>(graph, message_label, "creationDate");
     const int64_t creation_ms =
-        creation_date_col
-            ? creation_date_col->get_view(message_vid).milli_second
-            : 0;
+        creation_date_col->get_view(message_vid).milli_second;
 
     std::string content;
     if (is_post) {

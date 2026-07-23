@@ -123,9 +123,6 @@ class IC8 {
         ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
     auto comment_id_col =
         ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
-    if (!first_name_col || !last_name_col || !comment_content_col) {
-      THROW_RUNTIME_ERROR("ic8: failed to load required LDBC property columns");
-    }
 
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {

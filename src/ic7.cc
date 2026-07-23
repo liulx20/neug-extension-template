@@ -63,10 +63,9 @@ class IC7 {
   }
 
   static void collect_likes(
-      const StorageReadInterface& graph, const Schema& schema,
-      label_t person_label, label_t message_label, label_t likes_label,
-      label_t has_creator_label, bool is_post, vid_t root,
-      const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,
+      const StorageReadInterface& graph, label_t person_label,
+      label_t message_label, label_t likes_label, label_t has_creator_label,
+      bool is_post, vid_t root,
       const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
       const StorageReadInterface::vertex_column_t<int64_t>& person_id_col,
       std::vector<LikeResult>& messages) {
@@ -74,20 +73,8 @@ class IC7 {
         person_label, message_label, has_creator_label);
     const auto person_likes_message_in = graph.GetGenericIncomingGraphView(
         message_label, person_label, likes_label);
-    const bool has_like_date = schema.edge_has_property(
+    const auto like_accessor = graph.GetEdgeDataAccessor(
         person_label, message_label, likes_label, "creationDate");
-    EdgeDataAccessor like_accessor;
-    if (has_like_date) {
-      like_accessor = graph.GetEdgeDataAccessor(person_label, message_label,
-                                                likes_label, "creationDate");
-    }
-    const bool has_creator_date = schema.edge_has_property(
-        message_label, person_label, has_creator_label, "creationDate");
-    EdgeDataAccessor creator_accessor;
-    if (has_creator_date) {
-      creator_accessor = graph.GetEdgeDataAccessor(
-          message_label, person_label, has_creator_label, "creationDate");
-    }
 
     const auto root_messages = message_has_creator_in.get_edges(root);
     for (auto it = root_messages.begin(); it != root_messages.end(); ++it) {
@@ -101,13 +88,8 @@ class IC7 {
         info.person_id = person_id_col.get_view(info.person_vid);
         info.message_id = message_id;
         info.is_post = is_post;
-        if (has_like_date) {
-          info.like_date_ms =
-              like_accessor.get_typed_data<DateTime>(like_it).milli_second;
-        } else if (message_date_col) {
-          info.like_date_ms =
-              message_date_col->get_view(message_vid).milli_second;
-        }
+        info.like_date_ms =
+            like_accessor.get_typed_data<DateTime>(like_it).milli_second;
         messages.push_back(info);
       }
     }
@@ -131,10 +113,6 @@ class IC7 {
         graph, person_label, "firstName");
     auto last_name_col = ldbc::get_vertex_column<std::string_view>(
         graph, person_label, "lastName");
-    auto post_creation_date_col =
-        ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
-    auto comment_creation_date_col =
-        ldbc::get_vertex_column<DateTime>(graph, comment_label, "creationDate");
     auto person_id_col =
         ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
     auto post_id_col =
@@ -149,6 +127,10 @@ class IC7 {
         ldbc::get_vertex_column<int32_t>(graph, post_label, "length");
     auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
         graph, comment_label, "content");
+    auto post_creation_col =
+        ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
+    auto comment_creation_col =
+        ldbc::get_vertex_column<DateTime>(graph, comment_label, "creationDate");
 
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {
@@ -170,12 +152,11 @@ class IC7 {
     }
 
     std::vector<LikeResult> messages;
-    collect_likes(graph, schema, person_label, post_label, likes_label,
-                  has_creator_label, true, root, post_creation_date_col.get(),
-                  *post_id_col, *person_id_col, messages);
-    collect_likes(graph, schema, person_label, comment_label, likes_label,
-                  has_creator_label, false, root,
-                  comment_creation_date_col.get(), *comment_id_col,
+    collect_likes(graph, person_label, post_label, likes_label,
+                  has_creator_label, true, root, *post_id_col, *person_id_col,
+                  messages);
+    collect_likes(graph, person_label, comment_label, likes_label,
+                  has_creator_label, false, root, *comment_id_col,
                   *person_id_col, messages);
 
     std::sort(messages.begin(), messages.end(),
@@ -204,7 +185,6 @@ class IC7 {
         pq.push(messages[i]);
       }
     }
-
 
     std::vector<LikeResult> results;
     results.reserve(pq.size());
@@ -241,14 +221,10 @@ class IC7 {
             std::string(comment_content_col->get_view(row.message_vid)));
       }
 
-      int64_t message_creation_ms = 0;
-      if (row.is_post) {
-        message_creation_ms =
-            post_creation_date_col->get_view(row.message_vid).milli_second;
-      } else {
-        message_creation_ms =
-            comment_creation_date_col->get_view(row.message_vid).milli_second;
-      }
+      const int64_t message_creation_ms =
+          row.is_post
+              ? post_creation_col->get_view(row.message_vid).milli_second
+              : comment_creation_col->get_view(row.message_vid).milli_second;
       const int32_t minutes = static_cast<int32_t>(
           (row.like_date_ms - message_creation_ms) / kMillisPerMinute);
       minutes_latency_builder.push_back_opt(minutes);

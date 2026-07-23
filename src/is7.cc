@@ -99,30 +99,21 @@ class IS7 {
                       comment_label, comment_label, reply_of_label);
 
     std::vector<ReplyInfo> replies;
-    for (auto it = reply_in_view.get_edges(message_vid).begin();
-         it != reply_in_view.get_edges(message_vid).end(); ++it) {
+    const auto replies_edges = reply_in_view.get_edges(message_vid);
+    for (auto it = replies_edges.begin(); it != replies_edges.end(); ++it) {
       const vid_t comment_vid = *it;
-      const vid_t author_vid =
-          ldbc::get_single_out_neighbor(comment_has_creator_out, comment_vid);
-      if (author_vid == StorageReadInterface::kInvalidVid) {
+      const auto authors = comment_has_creator_out.get_edges(comment_vid);
+      auto author_it = authors.begin();
+      if (author_it == authors.end()) {
         continue;
       }
       ReplyInfo info;
       info.comment_vid = comment_vid;
-      info.author_vid = author_vid;
+      info.author_vid = *author_it;
       info.comment_id = comment_id_col->get_view(comment_vid);
-      info.author_id = person_id_col->get_view(author_vid);
-      for (auto author_it =
-               comment_has_creator_out.get_edges(comment_vid).begin();
-           author_it != comment_has_creator_out.get_edges(comment_vid).end();
-           ++author_it) {
-        if (*author_it == author_vid) {
-          info.creation_date_ms =
-              edge_accessor.get_typed_data<DateTime>(author_it).milli_second;
-          break;
-        }
-      }
-
+      info.author_id = person_id_col->get_view(info.author_vid);
+      info.creation_date_ms =
+          edge_accessor.get_typed_data<DateTime>(author_it).milli_second;
       replies.push_back(info);
     }
 

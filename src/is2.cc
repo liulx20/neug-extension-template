@@ -73,15 +73,10 @@ class IS2 {
   }
 
   static void scan_person_messages(
-      const StorageReadInterface& graph, const Schema& schema,
-      const ldbc::TypedView& has_creator_in, label_t person_label,
-      label_t message_label, bool is_post, vid_t person_vid,
+      const ldbc::TypedView& has_creator_in, bool is_post, vid_t person_vid,
       const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
       std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                           MessageInfoComparer>& pq) {
-    auto vertex_date_col =
-        ldbc::get_vertex_column<DateTime>(graph, message_label, "creationDate");
-
     ldbc::foreach_incoming_nbr_gt(
         has_creator_in, person_vid, DateTime(-1),
         [&](vid_t message_vid, const DateTime& creation_date) {
@@ -92,7 +87,6 @@ class IS2 {
           info.is_post = is_post;
           consider_message(pq, info);
         });
-    return;
   }
 
   static std::unique_ptr<function::CallFuncInputBase> bind(
@@ -149,10 +143,10 @@ class IS2 {
     std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                         MessageInfoComparer>
         pq;
-    scan_person_messages(graph, schema, post_has_creator_in, person_label,
-                         post_label, true, person_vid, *post_id_col, pq);
-    scan_person_messages(graph, schema, comment_has_creator_in, person_label,
-                         comment_label, false, person_vid, *comment_id_col, pq);
+    scan_person_messages(post_has_creator_in, true, person_vid, *post_id_col,
+                         pq);
+    scan_person_messages(comment_has_creator_in, false, person_vid,
+                         *comment_id_col, pq);
 
     std::vector<MessageInfo> results;
     results.reserve(pq.size());

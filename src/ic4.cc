@@ -104,13 +104,10 @@ class IC4 {
 
     const int64_t end_ms = start_date_ms + duration_days * kMillisPerDay;
 
-    const auto post_in = graph.GetGenericIncomingGraphView(
-        person_label, post_label, has_creator_label);
+    const auto post_in = ldbc::get_typed_incoming_view(
+        graph, person_label, post_label, has_creator_label);
     const auto post_tag_out =
         graph.GetGenericOutgoingGraphView(post_label, tag_label, has_tag_label);
-
-    auto post_date_col =
-        ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
 
     const size_t tag_num = graph.GetVertexSet(tag_label).size();
     std::vector<bool> neg(tag_num, false);
@@ -118,32 +115,28 @@ class IC4 {
 
     ldbc::foreach_knows_neighbor(
         graph, person_label, knows_label, root, [&](vid_t friend_vid) {
-          const auto posts = post_in.get_edges(friend_vid);
-          for (auto pit = posts.begin(); pit != posts.end(); ++pit) {
-            const vid_t post_vid = *pit;
-            const int64_t created =
-                post_date_col->get_view(post_vid).milli_second;
-            if (created >= end_ms) {
-              continue;
-            }
-            const auto tags = post_tag_out.get_edges(post_vid);
-            if (created >= start_date_ms) {
-              for (auto tit = tags.begin(); tit != tags.end(); ++tit) {
-                const vid_t tag_vid = *tit;
-                if (tag_vid < tag_num && !neg[tag_vid]) {
-                  ++tag_count[tag_vid];
+          ldbc::foreach_incoming_nbr_lt(
+              post_in, friend_vid, DateTime(end_ms),
+              [&](vid_t post_vid, const DateTime& creation_date) {
+                const int64_t created = creation_date.milli_second;
+                const auto tags = post_tag_out.get_edges(post_vid);
+                if (created >= start_date_ms) {
+                  for (auto tit = tags.begin(); tit != tags.end(); ++tit) {
+                    const vid_t tag_vid = *tit;
+                    if (tag_vid < tag_num && !neg[tag_vid]) {
+                      ++tag_count[tag_vid];
+                    }
+                  }
+                } else {
+                  for (auto tit = tags.begin(); tit != tags.end(); ++tit) {
+                    const vid_t tag_vid = *tit;
+                    if (tag_vid < tag_num) {
+                      neg[tag_vid] = true;
+                      tag_count[tag_vid] = 0;
+                    }
+                  }
                 }
-              }
-            } else {
-              for (auto tit = tags.begin(); tit != tags.end(); ++tit) {
-                const vid_t tag_vid = *tit;
-                if (tag_vid < tag_num) {
-                  neg[tag_vid] = true;
-                  tag_count[tag_vid] = 0;
-                }
-              }
-            }
-          }
+              });
         });
 
     std::priority_queue<TagRow, std::vector<TagRow>, TagRowCmp> heap;
