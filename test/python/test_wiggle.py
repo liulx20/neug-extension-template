@@ -24,9 +24,9 @@ def conn(tmp_path):
                 "Set NEUG_EXTENSION_HOME_PYENV to the NeuG build dir containing extension/"
             )
 
-    db = Database(str(tmp_path / "wiggle_db"))
+    db = Database(str(tmp_path / "ldbc_db"))
     connection = db.connect()
-    connection.execute("LOAD wiggle")
+    connection.execute("LOAD ldbc")
     yield connection
     db.close()
 

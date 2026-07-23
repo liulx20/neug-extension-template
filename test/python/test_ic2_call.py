@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end Python test for CALL ic2(...) via the wiggle extension."""
+"""End-to-end Python test for CALL ic2(...) via the ldbc extension."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 NEUG_ROOT = os.path.abspath(os.path.join(TEMPLATE_ROOT, "..", "neug"))
 EXT_BUILD = os.path.join(TEMPLATE_ROOT, "build", "release")
-EXT_LIB = os.path.join(EXT_BUILD, "extension", "wiggle", "libwiggle.neug_extension")
+EXT_LIB = os.path.join(EXT_BUILD, "extension", "ldbc", "libldbc.neug_extension")
 PYBIND_BUILD = os.path.join(NEUG_ROOT, "tools", "python_bind", "build", "lib.linux-x86_64-3.9")
 MIMALLOC_DIR = os.path.join(EXT_BUILD, "third_party", "mimalloc")
 

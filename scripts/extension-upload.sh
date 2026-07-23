@@ -6,7 +6,7 @@ set -euo pipefail
 # Usage: ./extension-upload.sh <name> <extension_version> <neug_version> <platform> <oss_prefix>
 #
 # Example:
-#   ./extension-upload.sh wiggle abc1234 0.1.3 linux_x86_64 oss://graphscope/neug/extensions
+#   ./extension-upload.sh ldbc abc1234 0.1.3 linux_x86_64 oss://graphscope/neug/extensions
 
 if [ "$#" -lt 5 ]; then
   echo "Usage: $0 <name> <extension_version> <neug_version> <platform> <oss_prefix>"

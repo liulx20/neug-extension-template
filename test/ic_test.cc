@@ -47,7 +47,7 @@ TEST(ICFunctions, FunctionSets) {
   EXPECT_EQ(neug::extension::ldbc::IC14Function::getFunctionSet().size(), 1u);
 }
 
-#ifdef WIGGLE_EXTENSION_LIB
+#ifdef LDBC_EXTENSION_LIB
 namespace {
 
 void setup_ic_mini_graph(neug::Connection* conn) {
@@ -195,7 +195,7 @@ void setup_ic_mini_graph(neug::Connection* conn) {
 }  // namespace
 
 TEST(ICFunctions, CallSmokeTests) {
-  const std::string ext_path = WIGGLE_EXTENSION_LIB;
+  const std::string ext_path = LDBC_EXTENSION_LIB;
   ASSERT_TRUE(std::filesystem::exists(ext_path)) << ext_path;
 
   const std::string db_path = "/tmp/ic_call_smoke_test";

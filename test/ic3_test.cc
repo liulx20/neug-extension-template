@@ -35,7 +35,7 @@ TEST(IC3Function, FunctionSet) {
   EXPECT_EQ(call_func->outputColumns.size(), 6u);
 }
 
-#ifdef WIGGLE_EXTENSION_LIB
+#ifdef LDBC_EXTENSION_LIB
 namespace {
 
 void setup_ic3_mini_graph(neug::Connection* conn) {
@@ -78,7 +78,7 @@ void setup_ic3_mini_graph(neug::Connection* conn) {
 }  // namespace
 
 TEST(IC3Function, CallWithLiteralArgs) {
-  const std::string ext_path = WIGGLE_EXTENSION_LIB;
+  const std::string ext_path = LDBC_EXTENSION_LIB;
   ASSERT_TRUE(std::filesystem::exists(ext_path)) << ext_path;
 
   const std::string db_path = "/tmp/ic3_call_literal_test";

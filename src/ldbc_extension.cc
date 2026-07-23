@@ -85,20 +85,21 @@ void Init() {
     register_ldbc_functions();
 
     neug::extension::ExtensionAPI::registerExtension(
-        neug::extension::ExtensionInfo{"wiggle",
-                                       "LDBC SNB Interactive read queries "
-                                       "(ic1-ic14, is1-is7) and wiggle()."});
+        neug::extension::ExtensionInfo{
+            "ldbc",
+            "LDBC SNB Interactive read queries (ic1-ic14, is1-is7) "
+            "and demo scalar wiggle()."});
 
-    LOG(INFO) << "[wiggle extension] initialized";
+    LOG(INFO) << "[ldbc extension] initialized";
   } catch (const std::exception& e) {
-    THROW_EXCEPTION_WITH_FILE_LINE("[wiggle extension] registration failed: " +
+    THROW_EXCEPTION_WITH_FILE_LINE("[ldbc extension] registration failed: " +
                                    std::string(e.what()));
   } catch (...) {
     THROW_EXCEPTION_WITH_FILE_LINE(
-        "[wiggle extension] registration failed: unknown exception");
+        "[ldbc extension] registration failed: unknown exception");
   }
 }
 
-const char* Name() { return "WIGGLE"; }
+const char* Name() { return "LDBC"; }
 
 }  // extern "C"

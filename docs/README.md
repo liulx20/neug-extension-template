@@ -4,7 +4,7 @@ This directory keeps the original template documentation. For this LDBC fork, st
 
 ## Template workflow
 
-The upstream template demonstrates a minimal `wiggle()` scalar function and shows how to build an out-of-tree extension.
+This LDBC fork builds the `ldbc` extension (`LOAD ldbc`). The upstream demo scalar `wiggle()` is still included (`include/wiggle_function.h`, `test/wiggle_test.cc`).
 
 ### Building
 
@@ -15,8 +15,8 @@ make
 Artifacts:
 
 ```sh
-./build/release/extension/wiggle/libwiggle.neug_extension
-./build/release/wiggle_extension_test
+./build/release/extension/ldbc/libldbc.neug_extension
+./build/release/ldbc_extension_test
 ```
 
 ### NeuG source resolution
@@ -42,7 +42,7 @@ python3 ./scripts/bootstrap-template.py <extension_name_in_snake_case>
 
 ```
 -DNEUG_EXTENSION_CONFIGS=<absolute_path_to>/extension_config.cmake
--DBUILD_EXTENSIONS=wiggle
+-DBUILD_EXTENSIONS=ldbc
 -DBUILD_PYTHON=OFF
 -DBUILD_TEST=ON
 ```

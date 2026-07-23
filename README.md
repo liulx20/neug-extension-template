@@ -5,19 +5,21 @@ Out-of-tree NeuG extension that implements LDBC SNB Interactive **read queries**
 - `CALL ic1(...)` … `CALL ic14(...)` — Interactive Complex
 - `CALL is1(...)` … `CALL is7(...)` — Interactive Short
 
-The extension name is still `wiggle` (from the upstream [neug-extension-template](https://github.com/alibaba/neug-extension-template)); load it with `LOAD wiggle`.
+Load it with `LOAD ldbc`. The demo scalar `wiggle()` from the upstream template is still registered.
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
 | `extension_config.cmake` | Registers this repo with NeuG (`neug_extension_load`) |
-| `CMakeLists.txt` | Extension build rules |
+| `CMakeLists.txt` | Extension build rules (`EXTENSION_NAME=ldbc`) |
 | `include/ldbc_common.h` | Shared graph traversal helpers |
 | `include/ic*.h`, `include/is*.h` | Per-query function declarations |
+| `include/wiggle_function.h` | Demo scalar `wiggle()` (from upstream template) |
 | `src/ic*.cc`, `src/is*.cc` | Per-query implementations |
 | `src/ldbc_common.cc` | Shared helpers |
-| `src/wiggle_extension.cc` | `Init()` / `Name()` entry point |
+| `src/ldbc_extension.cc` | `Init()` / `Name()` — registers IC/IS + `wiggle()` |
+| `test/wiggle_test.cc` | Unit tests for `wiggle()` |
 | `test/` | GTest unit tests and Python smoke tests |
 
 ## Prerequisites
@@ -38,7 +40,7 @@ Layout after init:
 
 ```text
 neug-extension-template/
-  neug/                      # submodule (liulx20/neug@feat/out-of-tree-extension-cmake, PR #745)
+  neug/                      # submodule (alibaba/neug@main)
   Makefile
   ...
 ```
@@ -55,8 +57,8 @@ The Makefile resolves NeuG in order: `NEUG_SRCDIR` → `./neug` submodule → `.
 Artifacts:
 
 ```text
-build/release/extension/wiggle/libwiggle.neug_extension
-build/release/wiggle_extension_test          # when BUILD_TEST=ON
+build/release/extension/ldbc/libldbc.neug_extension
+build/release/ldbc_extension_test          # when BUILD_TEST=ON
 ```
 
 Faster rebuilds:
@@ -69,7 +71,7 @@ GEN=ninja EXTRA_CMAKE_FLAGS=-G Ninja make
 
 GitHub Actions clones NeuG into `./neug` before `make` (see `.github/workflows/MainDistributionPipeline.yml`).
 
-This extension needs NeuG with out-of-tree extension support (`cmake/neug_extension.cmake`, `NEUG_EXTENSION_CONFIGS`). The submodule and CI default to `liulx20/neug@feat/out-of-tree-extension-cmake` ([PR #745](https://github.com/alibaba/neug/pull/745)). Once that lands on [alibaba/neug](https://github.com/alibaba/neug) `main`, switch the default repository/ref accordingly.
+This extension needs NeuG with out-of-tree extension support (`cmake/neug_extension.cmake`, `NEUG_EXTENSION_CONFIGS`).
 
 Manual workflow dispatch can override `neug_repository` and `neug_ref`.
 
@@ -96,17 +98,18 @@ from neug import Database
 os.environ["NEUG_EXTENSION_HOME_PYENV"] = os.path.abspath("build/release")
 db = Database(":memory:")
 conn = db.connect()
-conn.execute("LOAD wiggle")
+conn.execute("LOAD ldbc")
+conn.execute("RETURN wiggle('Sam')")  # demo scalar from the template
 conn.execute("CALL ic2($personId, $maxDate)", parameters={...})
 ```
 
 ### With LDBC driver
 
-Point the [ldbc](https://github.com/alibaba/neug/tree/neug) benchmark repo at this build:
+Point the LDBC benchmark repo at this build:
 
 ```bash
 export NEUG_WORKSPACE=/path/to/workspace   # parent of neug/ and neug-extension-template/
-export NEUG_EXTENSION_LIB=$NEUG_WORKSPACE/neug-extension-template/build/release/extension/wiggle/libwiggle.neug_extension
+export NEUG_EXTENSION_LIB=$NEUG_WORKSPACE/neug-extension-template/build/release/extension/ldbc/libldbc.neug_extension
 cd ldbc && scripts/start_server.sh
 ```
 
@@ -118,4 +121,4 @@ Extension binaries must be built against the same NeuG version as the runtime. S
 
 ## Template origin
 
-This repo started from the NeuG extension template. To fork a **new** extension name from scratch, run `python3 scripts/bootstrap-template.py <name>` on a clean template checkout (not recommended on this LDBC fork).
+This repo started from the NeuG extension template (`wiggle`). The extension name is now `ldbc`.

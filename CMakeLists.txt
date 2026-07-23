@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 
-set(EXTENSION_NAME wiggle)
+# Extension LOAD name is "ldbc" (libldbc.neug_extension). Demo scalar wiggle()
+# still ships in include/wiggle_function.h and is registered from ldbc_extension.cc.
+set(EXTENSION_NAME ldbc)
 
-file(GLOB WIGGLE_EXTENSION_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc")
-set(WIGGLE_EXTENSION_OBJECT_FILES ${WIGGLE_EXTENSION_SOURCES})
+file(GLOB LDBC_EXTENSION_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc")
+set(LDBC_EXTENSION_OBJECT_FILES ${LDBC_EXTENSION_SOURCES})
 
 build_extension_lib("${EXTENSION_NAME}")
 
@@ -17,6 +19,7 @@ target_link_libraries(neug_${EXTENSION_NAME}_extension PRIVATE neug)
 if(BUILD_TEST)
     add_extension_test(NAME ${EXTENSION_NAME}
         TEST_SRCS
+            ${CMAKE_CURRENT_SOURCE_DIR}/test/ldbc_test.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/test/wiggle_test.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/test/ic2_test.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/test/ic3_test.cc
@@ -24,5 +27,5 @@ if(BUILD_TEST)
             ${CMAKE_CURRENT_SOURCE_DIR}/test/is_test.cc
     )
     target_compile_definitions(${EXTENSION_NAME}_extension_test PRIVATE
-        WIGGLE_EXTENSION_LIB="${CMAKE_BINARY_DIR}/extension/${EXTENSION_NAME}/lib${EXTENSION_NAME}.neug_extension")
+        LDBC_EXTENSION_LIB="${CMAKE_BINARY_DIR}/extension/${EXTENSION_NAME}/lib${EXTENSION_NAME}.neug_extension")
 endif()
