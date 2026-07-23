@@ -80,28 +80,22 @@ class IC8 {
   }
 
   static void scan_replies(
-      label_t person_label, label_t has_creator_label,
       const CsrView& reply_in_view, const CsrView& comment_has_creator_out,
-      vid_t message_vid, 
-      const StorageReadInterface::vertex_column_t<DateTime>* comment_date_col,
+      const EdgeDataAccessor& creator_accessor, vid_t message_vid,
       const StorageReadInterface::vertex_column_t<int64_t>& comment_id_col,
       std::priority_queue<CommentResult, std::vector<CommentResult>,
                           CommentResultComparer>& pq) {
     const auto replies = reply_in_view.get_edges(message_vid);
     for (auto it = replies.begin(); it != replies.end(); ++it) {
       const vid_t comment_vid = *it;
-      const vid_t author_vid =
-          ldbc::get_single_out_neighbor(comment_has_creator_out, comment_vid);
-      if (author_vid == StorageReadInterface::kInvalidVid) {
-        continue;
-      }
+      const auto authors = comment_has_creator_out.get_edges(comment_vid);
+      auto author_it = authors.begin();
       CommentResult info;
       info.comment_vid = comment_vid;
-      info.author_vid = author_vid;
+      info.author_vid = *author_it;
       info.comment_id = comment_id_col.get_view(comment_vid);
-  
       info.creation_date_ms =
-          comment_date_col->get_view(comment_vid).milli_second;
+          creator_accessor.get_typed_data<DateTime>(author_it).milli_second;
       consider_comment(pq, info);
     }
   }
@@ -125,8 +119,6 @@ class IC8 {
         graph, person_label, "lastName");
     auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
         graph, comment_label, "content");
-    auto comment_date_col =
-        ldbc::get_vertex_column<DateTime>(graph, comment_label, "creationDate");
     auto person_id_col =
         ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
     auto comment_id_col =
@@ -148,30 +140,23 @@ class IC8 {
         post_label, comment_label, reply_of_label);
     const auto comment_reply_of_comment_in = graph.GetGenericIncomingGraphView(
         comment_label, comment_label, reply_of_label);
-    const bool has_creator_date = schema.edge_has_property(
-        comment_label, person_label, has_creator_label, "creationDate");
-    EdgeDataAccessor creator_accessor;
-    if (has_creator_date) {
-      creator_accessor = graph.GetEdgeDataAccessor(
-          comment_label, person_label, has_creator_label, "creationDate");
-    }
     const auto comment_has_creator_out = graph.GetGenericOutgoingGraphView(
         comment_label, person_label, has_creator_label);
+    const auto creator_accessor = graph.GetEdgeDataAccessor(
+        comment_label, person_label, has_creator_label, "creationDate");
 
     std::priority_queue<CommentResult, std::vector<CommentResult>,
                         CommentResultComparer>
         pq;
     const auto root_posts = post_has_creator_in.get_edges(root);
     for (auto it = root_posts.begin(); it != root_posts.end(); ++it) {
-      scan_replies(person_label, has_creator_label, comment_reply_of_post_in,
-                   comment_has_creator_out, *it, comment_date_col.get(), *comment_id_col,
-                   pq);
+      scan_replies(comment_reply_of_post_in, comment_has_creator_out,
+                   creator_accessor, *it, *comment_id_col, pq);
     }
     const auto root_comments = comment_has_creator_in.get_edges(root);
     for (auto it = root_comments.begin(); it != root_comments.end(); ++it) {
-      scan_replies(person_label, has_creator_label, comment_reply_of_comment_in,
-                   comment_has_creator_out, *it, comment_date_col.get(), *comment_id_col,
-                   pq);
+      scan_replies(comment_reply_of_comment_in, comment_has_creator_out,
+                   creator_accessor, *it, *comment_id_col, pq);
     }
 
     std::vector<CommentResult> results;

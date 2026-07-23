@@ -141,6 +141,14 @@ class IC7 {
         ldbc::get_vertex_column<int64_t>(graph, post_label, "id");
     auto comment_id_col =
         ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
+    auto post_content_col = ldbc::get_vertex_column<std::string_view>(
+        graph, post_label, "content");
+    auto post_image_col = ldbc::get_vertex_column<std::string_view>(
+        graph, post_label, "imageFile");
+    auto post_length_col =
+        ldbc::get_vertex_column<int32_t>(graph, post_label, "length");
+    auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
+        graph, comment_label, "content");
 
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {
@@ -223,18 +231,23 @@ class IC7 {
           std::string(last_name_col->get_view(row.person_vid)));
       like_date_builder.push_back_opt(DateTime(row.like_date_ms));
       message_id_builder.push_back_opt(row.message_id);
-      message_content_builder.push_back_opt(ldbc::message_content(
-          graph, post_label, comment_label, row.message_vid, row.is_post));
+      if (row.is_post) {
+        const auto& content = post_length_col->get_view(row.message_vid) == 0
+                                  ? post_image_col->get_view(row.message_vid)
+                                  : post_content_col->get_view(row.message_vid);
+        message_content_builder.push_back_opt(std::string(content));
+      } else {
+        message_content_builder.push_back_opt(
+            std::string(comment_content_col->get_view(row.message_vid)));
+      }
 
       int64_t message_creation_ms = 0;
       if (row.is_post) {
-    
-            message_creation_ms =
-              post_creation_date_col->get_view(row.message_vid).milli_second;
+        message_creation_ms =
+            post_creation_date_col->get_view(row.message_vid).milli_second;
       } else {
-
-          message_creation_ms =
-              comment_creation_date_col->get_view(row.message_vid).milli_second;
+        message_creation_ms =
+            comment_creation_date_col->get_view(row.message_vid).milli_second;
       }
       const int32_t minutes = static_cast<int32_t>(
           (row.like_date_ms - message_creation_ms) / kMillisPerMinute);

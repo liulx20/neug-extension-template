@@ -71,13 +71,9 @@ bool find_message_vertex(const StorageReadInterface& graph, label_t post_label,
                          label_t comment_label, int64_t message_id,
                          vid_t& message_vid, bool& is_post);
 
-vid_t resolve_root_post(const StorageReadInterface& graph, label_t post_label,
-                        label_t comment_label, label_t reply_of_label,
-                        vid_t message_vid, bool is_post);
-
-std::string message_content(const StorageReadInterface& graph,
-                            label_t post_label, label_t comment_label,
-                            vid_t message_vid, bool is_post);
+vid_t resolve_root_post(const CsrView& comment_to_post,
+                        const CsrView& comment_to_comment, vid_t message_vid,
+                        bool is_post);
 
 template <typename Func>
 inline void foreach_knows_neighbor(const StorageReadInterface& graph,

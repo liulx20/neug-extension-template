@@ -57,16 +57,12 @@ bool find_message_vertex(const StorageReadInterface& graph, label_t post_label,
   return false;
 }
 
-vid_t resolve_root_post(const StorageReadInterface& graph, label_t post_label,
-                        label_t comment_label, label_t reply_of_label,
-                        vid_t message_vid, bool is_post) {
+vid_t resolve_root_post(const CsrView& comment_to_post,
+                        const CsrView& comment_to_comment, vid_t message_vid,
+                        bool is_post) {
   if (is_post) {
     return message_vid;
   }
-  const auto comment_to_post = graph.GetGenericOutgoingGraphView(
-      comment_label, post_label, reply_of_label);
-  const auto comment_to_comment = graph.GetGenericOutgoingGraphView(
-      comment_label, comment_label, reply_of_label);
   vid_t current = message_vid;
   while (true) {
     const vid_t post_vid = get_single_out_neighbor(comment_to_post, current);
@@ -79,28 +75,6 @@ vid_t resolve_root_post(const StorageReadInterface& graph, label_t post_label,
     }
     current = parent;
   }
-}
-
-std::string message_content(const StorageReadInterface& graph,
-                            label_t post_label, label_t comment_label,
-                            vid_t message_vid, bool is_post) {
-  if (is_post) {
-    auto content_col =
-        get_vertex_column<std::string_view>(graph, post_label, "content");
-    auto image_col =
-        get_vertex_column<std::string_view>(graph, post_label, "imageFile");
-    auto length_col = get_vertex_column<int32_t>(graph, post_label, "length");
-    if (!content_col || !image_col || !length_col) {
-      return "";
-    }
-    const auto& content = length_col->get_view(message_vid) == 0
-                              ? image_col->get_view(message_vid)
-                              : content_col->get_view(message_vid);
-    return std::string(content);
-  }
-  auto content_col =
-      get_vertex_column<std::string_view>(graph, comment_label, "content");
-  return content_col ? std::string(content_col->get_view(message_vid)) : "";
 }
 
 vid_t find_vertex_by_string_prop(const StorageReadInterface& graph,

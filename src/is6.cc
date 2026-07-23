@@ -72,8 +72,12 @@ class IS6 {
       return execution::Context{};
     }
 
+    const auto comment_to_post = graph.GetGenericOutgoingGraphView(
+        comment_label, post_label, reply_of_label);
+    const auto comment_to_comment = graph.GetGenericOutgoingGraphView(
+        comment_label, comment_label, reply_of_label);
     const vid_t post_vid = ldbc::resolve_root_post(
-        graph, post_label, comment_label, reply_of_label, message_vid, is_post);
+        comment_to_post, comment_to_comment, message_vid, is_post);
     if (post_vid == StorageReadInterface::kInvalidVid) {
       return execution::Context{};
     }

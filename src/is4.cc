@@ -58,8 +58,25 @@ class IS4 {
         creation_date_col
             ? creation_date_col->get_view(message_vid).milli_second
             : 0;
-    const std::string content = ldbc::message_content(
-        graph, post_label, comment_label, message_vid, is_post);
+
+    std::string content;
+    if (is_post) {
+      auto content_col =
+          ldbc::get_vertex_column<std::string_view>(graph, post_label, "content");
+      auto image_col = ldbc::get_vertex_column<std::string_view>(
+          graph, post_label, "imageFile");
+      auto length_col =
+          ldbc::get_vertex_column<int32_t>(graph, post_label, "length");
+  
+      content = std::string(length_col->get_view(message_vid) == 0
+                                ? image_col->get_view(message_vid)
+                                : content_col->get_view(message_vid));
+    } else {
+      auto content_col = ldbc::get_vertex_column<std::string_view>(
+          graph, comment_label, "content");
+   
+        content = std::string(content_col->get_view(message_vid));
+    }
 
     ValueColumnBuilder<std::string> content_builder;
     ValueColumnBuilder<DateTime> date_builder;

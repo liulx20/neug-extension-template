@@ -57,33 +57,6 @@ class IC2 {
     }
   };
 
-  template <typename T>
-  static std::shared_ptr<StorageReadInterface::vertex_column_t<T>>
-  get_vertex_column(const StorageReadInterface& graph, label_t label,
-                    const std::string& prop_name) {
-    auto col = graph.GetVertexPropColumn(label, prop_name);
-    return std::dynamic_pointer_cast<StorageReadInterface::vertex_column_t<T>>(
-        col);
-  }
-
-  static void foreach_knows_neighbor(const StorageReadInterface& graph,
-                                     label_t person_label, label_t knows_label,
-                                     vid_t root, const auto& func) {
-    const auto out_view = graph.GetGenericOutgoingGraphView(
-        person_label, person_label, knows_label);
-    const auto in_view = graph.GetGenericIncomingGraphView(
-        person_label, person_label, knows_label);
-
-    for (auto it = out_view.get_edges(root).begin();
-         it != out_view.get_edges(root).end(); ++it) {
-      func(*it);
-    }
-    for (auto it = in_view.get_edges(root).begin();
-         it != in_view.get_edges(root).end(); ++it) {
-      func(*it);
-    }
-  }
-
   static void scan_messages_for_friend(
       const ldbc::TypedView& has_creator_in,
       const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
@@ -156,18 +129,18 @@ class IC2 {
     const label_t knows_label = schema.get_edge_label_id("KNOWS");
     const label_t has_creator_label = schema.get_edge_label_id("HASCREATOR");
 
-    auto first_name_col =
-        get_vertex_column<std::string_view>(graph, person_label, "firstName");
-    auto last_name_col =
-        get_vertex_column<std::string_view>(graph, person_label, "lastName");
-    auto post_content_col =
-        get_vertex_column<std::string_view>(graph, post_label, "content");
-    auto post_image_col =
-        get_vertex_column<std::string_view>(graph, post_label, "imageFile");
+    auto first_name_col = ldbc::get_vertex_column<std::string_view>(
+        graph, person_label, "firstName");
+    auto last_name_col = ldbc::get_vertex_column<std::string_view>(
+        graph, person_label, "lastName");
+    auto post_content_col = ldbc::get_vertex_column<std::string_view>(
+        graph, post_label, "content");
+    auto post_image_col = ldbc::get_vertex_column<std::string_view>(
+        graph, post_label, "imageFile");
     auto post_length_col =
-        get_vertex_column<int32_t>(graph, post_label, "length");
-    auto comment_content_col =
-        get_vertex_column<std::string_view>(graph, comment_label, "content");
+        ldbc::get_vertex_column<int32_t>(graph, post_label, "length");
+    auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
+        graph, comment_label, "content");
     auto person_id_col =
         ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
     auto post_id_col =
@@ -189,7 +162,7 @@ class IC2 {
                         MessageInfoComparer>
         pq;
     int64_t min_date_ms = 0;
-    foreach_knows_neighbor(
+    ldbc::foreach_knows_neighbor(
         graph, person_label, knows_label, root, [&](vid_t friend_vid) {
           scan_messages_for_friend(post_has_creator_in, *post_id_col, true,
                                    friend_vid, min_date_ms, max_date_ms, pq);

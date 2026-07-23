@@ -328,44 +328,24 @@ class IC1 {
       last_name_builder.push_back_opt(std::string(row.last_name));
 
       birthday_builder.push_back_opt(birthday_col->get_view(v));
-      if (creation_date_col) {
-        creation_date_builder.push_back_opt(creation_date_col->get_view(v));
-      } else {
-        creation_date_builder.push_back_null();
-      }
+      creation_date_builder.push_back_opt(creation_date_col->get_view(v));
+  
       gender_builder.push_back_opt(std::string(gender_col->get_view(v)));
-      if (browser_used_col) {
-        browser_used_builder.push_back_opt(
-            std::string(browser_used_col->get_view(v)));
-      } else {
-        browser_used_builder.push_back_null();
-      }
-      if (location_ip_col) {
-        location_ip_builder.push_back_opt(
-            std::string(location_ip_col->get_view(v)));
-      } else {
-        location_ip_builder.push_back_null();
-      }
+   
+      browser_used_builder.push_back_opt(
+          std::string(browser_used_col->get_view(v)));
+
+      location_ip_builder.push_back_opt(
+          std::string(location_ip_col->get_view(v)));
+    
 
       const vid_t city_vid =
           ldbc::get_single_out_neighbor(person_located_in_out, v);
-      if (city_vid != StorageReadInterface::kInvalidVid) {
-        city_name_builder.push_back_opt(
-            std::string(place_name_col->get_view(city_vid)));
-      } else {
-        city_name_builder.push_back_null();
-      }
-
-      if (email_col) {
-        email_builder.push_back_opt(std::string(email_col->get_view(v)));
-      } else {
-        email_builder.push_back_null();
-      }
-      if (language_col) {
-        language_builder.push_back_opt(std::string(language_col->get_view(v)));
-      } else {
-        language_builder.push_back_null();
-      }
+      city_name_builder.push_back_opt(
+          std::string(place_name_col->get_view(city_vid)));
+      email_builder.push_back_opt(std::string(email_col->get_view(v)));
+      language_builder.push_back_opt(std::string(language_col->get_view(v)));
+    
 
       std::vector<Value> university_values;
       const auto study_edges = person_study_at_out.get_edges(v);
@@ -376,10 +356,8 @@ class IC1 {
         class_year = class_year_accessor.get_typed_data<int32_t>(it);
         const vid_t place_vid =
             ldbc::get_single_out_neighbor(org_located_in_out, org_vid);
-        std::string city_name;
-        if (place_vid != StorageReadInterface::kInvalidVid) {
-          city_name = std::string(place_name_col->get_view(place_vid));
-        }
+        std::string city_name = std::string(place_name_col->get_view(place_vid));
+        
         std::vector<Value> tuple_vals;
         tuple_vals.emplace_back(
             Value::STRING(std::string(org_name_col->get_view(org_vid))));
@@ -399,10 +377,8 @@ class IC1 {
         
         const vid_t place_vid =
             ldbc::get_single_out_neighbor(org_located_in_out, org_vid);
-        std::string country_name;
-        if (place_vid != StorageReadInterface::kInvalidVid) {
-          country_name = std::string(place_name_col->get_view(place_vid));
-        }
+        std::string country_name = std::string(place_name_col->get_view(place_vid));
+        
         std::vector<Value> tuple_vals;
         tuple_vals.emplace_back(
             Value::STRING(std::string(org_name_col->get_view(org_vid))));

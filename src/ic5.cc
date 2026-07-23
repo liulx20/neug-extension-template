@@ -52,51 +52,6 @@ class IC5 {
     }
   };
 
-  static void collect_knows_1d_2d_neighbors(const StorageReadInterface& graph,
-                                            label_t person_label,
-                                            label_t knows_label, vid_t root,
-                                            std::vector<vid_t>& friends) {
-    const auto out_view = graph.GetGenericOutgoingGraphView(
-        person_label, person_label, knows_label);
-    const auto in_view = graph.GetGenericIncomingGraphView(
-        person_label, person_label, knows_label);
-
-    const size_t person_num = graph.GetVertexSet(person_label).size();
-    std::vector<bool> seen(person_num, false);
-    seen[root] = true;
-
-    std::vector<vid_t> neighbors;
-    const auto root_in = in_view.get_edges(root);
-    for (auto it = root_in.begin(); it != root_in.end(); ++it) {
-      neighbors.push_back(*it);
-    }
-    const auto root_out = out_view.get_edges(root);
-    for (auto it = root_out.begin(); it != root_out.end(); ++it) {
-      neighbors.push_back(*it);
-    }
-
-    for (vid_t v : neighbors) {
-      if (!seen[v]) {
-        seen[v] = true;
-        friends.push_back(v);
-      }
-      const auto v_in = in_view.get_edges(v);
-      for (auto it = v_in.begin(); it != v_in.end(); ++it) {
-        if (!seen[*it]) {
-          seen[*it] = true;
-          friends.push_back(*it);
-        }
-      }
-      const auto v_out = out_view.get_edges(v);
-      for (auto it = v_out.begin(); it != v_out.end(); ++it) {
-        if (!seen[*it]) {
-          seen[*it] = true;
-          friends.push_back(*it);
-        }
-      }
-    }
-  }
-
   static std::unique_ptr<function::CallFuncInputBase> bind(
       const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
       const ::physical::PhysicalPlan& plan, int op_idx) {
@@ -159,8 +114,9 @@ class IC5 {
         graph, person_label, forum_label, has_member_label);
 
     std::vector<vid_t> friends_list;
-    collect_knows_1d_2d_neighbors(graph, person_label, knows_label, root,
-                                  friends_list);
+    ldbc::foreach_knows_1d_2d_neighbor(
+        graph, person_label, knows_label, root,
+        [&](vid_t friend_vid) { friends_list.push_back(friend_vid); });
 
     for (vid_t friend_vid : friends_list) {
       ldbc::foreach_incoming_nbr_gt(

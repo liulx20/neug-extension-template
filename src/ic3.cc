@@ -123,10 +123,6 @@ class IC3 {
         country_y = place_vid;
       }
     }
-    if (country_x == StorageReadInterface::kInvalidVid ||
-        country_y == StorageReadInterface::kInvalidVid) {
-      THROW_INVALID_ARGUMENT_EXCEPTION("ic3: country not found");
-    }
 
     std::vector<uint8_t> city_in_country_x_or_y(place_set.size(), 0);
 

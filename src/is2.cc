@@ -126,9 +126,14 @@ class IS2 {
         ldbc::get_vertex_column<int64_t>(graph, post_label, "id");
     auto comment_id_col =
         ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
-    if (!first_name_col || !last_name_col) {
-      THROW_RUNTIME_ERROR("is2: failed to load required LDBC property columns");
-    }
+    auto post_content_col = ldbc::get_vertex_column<std::string_view>(
+        graph, post_label, "content");
+    auto post_image_col = ldbc::get_vertex_column<std::string_view>(
+        graph, post_label, "imageFile");
+    auto post_length_col =
+        ldbc::get_vertex_column<int32_t>(graph, post_label, "length");
+    auto comment_content_col = ldbc::get_vertex_column<std::string_view>(
+        graph, comment_label, "content");
 
     vid_t person_vid = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id),
@@ -158,6 +163,10 @@ class IS2 {
 
     const auto post_has_creator_out = graph.GetGenericOutgoingGraphView(
         post_label, person_label, has_creator_label);
+    const auto comment_to_post = graph.GetGenericOutgoingGraphView(
+        comment_label, post_label, reply_of_label);
+    const auto comment_to_comment = graph.GetGenericOutgoingGraphView(
+        comment_label, comment_label, reply_of_label);
 
     ValueColumnBuilder<int64_t> message_id_builder;
     ValueColumnBuilder<std::string> message_content_builder;
@@ -178,8 +187,15 @@ class IS2 {
     for (size_t i = results.size(); i > 0; --i) {
       const auto& row = results[i - 1];
       message_id_builder.push_back_opt(row.message_id);
-      message_content_builder.push_back_opt(ldbc::message_content(
-          graph, post_label, comment_label, row.message_vid, row.is_post));
+      if (row.is_post) {
+        const auto& content = post_length_col->get_view(row.message_vid) == 0
+                                  ? post_image_col->get_view(row.message_vid)
+                                  : post_content_col->get_view(row.message_vid);
+        message_content_builder.push_back_opt(std::string(content));
+      } else {
+        message_content_builder.push_back_opt(
+            std::string(comment_content_col->get_view(row.message_vid)));
+      }
       message_date_builder.push_back_opt(DateTime(row.creation_date_ms));
 
       if (row.is_post) {
@@ -190,9 +206,8 @@ class IS2 {
         original_post_author_last_builder.push_back_opt(
             std::string(last_name_col->get_view(person_vid)));
       } else {
-        const vid_t post_vid =
-            ldbc::resolve_root_post(graph, post_label, comment_label,
-                                    reply_of_label, row.message_vid, false);
+        const vid_t post_vid = ldbc::resolve_root_post(
+            comment_to_post, comment_to_comment, row.message_vid, false);
         const int64_t post_id = post_id_col->get_view(post_vid);
         original_post_id_builder.push_back_opt(post_id);
         const vid_t author_vid =
