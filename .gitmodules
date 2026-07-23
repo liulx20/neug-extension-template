@@ -2,5 +2,5 @@
 # After clone: git submodule update --init --recursive
 [submodule "neug"]
 	path = neug
-	url = https://github.com/liulx20/neug.git
-	branch = feat/out-of-tree-extension-cmake
+	url = https://github.com/alibaba/neug.git
+	branch = main
