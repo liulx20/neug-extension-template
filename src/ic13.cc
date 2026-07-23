@@ -40,7 +40,7 @@ class IC13 {
           "ic13 requires 2 arguments: person1Id and person2Id");
     }
     auto input = std::make_unique<IC13FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 

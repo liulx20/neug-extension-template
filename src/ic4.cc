@@ -48,19 +48,19 @@ class IC4 {
   };
 
   static void try_push_tag(
-      std::priority_queue<TagRow, std::vector<TagRow>, TagRowCmp>* heap,
+      std::priority_queue<TagRow, std::vector<TagRow>, TagRowCmp>& heap,
       int count, std::string_view name) {
     if (count == 0) {
       return;
     }
-    if (heap->size() < kTopN) {
-      heap->push({count, name});
+    if (heap.size() < kTopN) {
+      heap.push({count, name});
       return;
     }
-    const auto& top = heap->top();
+    const auto& top = heap.top();
     if (count > top.count || (count == top.count && name < top.name)) {
-      heap->pop();
-      heap->push({count, name});
+      heap.pop();
+      heap.push({count, name});
     }
   }
 
@@ -74,7 +74,7 @@ class IC4 {
           "ic4 requires 3 arguments: personId, startDate, durationDays");
     }
     auto input = std::make_unique<IC4FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -96,9 +96,6 @@ class IC4 {
 
     auto tag_name_col =
         ldbc::get_vertex_column<std::string_view>(graph, tag_label, "name");
-    if (!tag_name_col) {
-      THROW_RUNTIME_ERROR("ic4: failed to load TAG.name column");
-    }
 
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {
@@ -114,9 +111,6 @@ class IC4 {
 
     auto post_date_col =
         ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
-    if (!post_date_col) {
-      THROW_RUNTIME_ERROR("ic4: failed to load POST.creationDate column");
-    }
 
     const size_t tag_num = graph.GetVertexSet(tag_label).size();
     std::vector<bool> neg(tag_num, false);
@@ -158,7 +152,7 @@ class IC4 {
       if (count == 0) {
         continue;
       }
-      try_push_tag(&heap, count, tag_name_col->get_view(tag_vid));
+      try_push_tag(heap, count, tag_name_col->get_view(tag_vid));
     }
 
     std::vector<TagRow> rows;

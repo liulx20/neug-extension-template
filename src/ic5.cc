@@ -55,7 +55,7 @@ class IC5 {
   static void collect_knows_1d_2d_neighbors(const StorageReadInterface& graph,
                                             label_t person_label,
                                             label_t knows_label, vid_t root,
-                                            std::vector<vid_t>* friends) {
+                                            std::vector<vid_t>& friends) {
     const auto out_view = graph.GetGenericOutgoingGraphView(
         person_label, person_label, knows_label);
     const auto in_view = graph.GetGenericIncomingGraphView(
@@ -78,20 +78,20 @@ class IC5 {
     for (vid_t v : neighbors) {
       if (!seen[v]) {
         seen[v] = true;
-        friends->push_back(v);
+        friends.push_back(v);
       }
       const auto v_in = in_view.get_edges(v);
       for (auto it = v_in.begin(); it != v_in.end(); ++it) {
         if (!seen[*it]) {
           seen[*it] = true;
-          friends->push_back(*it);
+          friends.push_back(*it);
         }
       }
       const auto v_out = out_view.get_edges(v);
       for (auto it = v_out.begin(); it != v_out.end(); ++it) {
         if (!seen[*it]) {
           seen[*it] = true;
-          friends->push_back(*it);
+          friends.push_back(*it);
         }
       }
     }
@@ -107,7 +107,7 @@ class IC5 {
           "ic5 requires 2 arguments: personId and minDate");
     }
     auto input = std::make_unique<IC5FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -160,7 +160,7 @@ class IC5 {
 
     std::vector<vid_t> friends_list;
     collect_knows_1d_2d_neighbors(graph, person_label, knows_label, root,
-                                  &friends_list);
+                                  friends_list);
 
     for (vid_t friend_vid : friends_list) {
       ldbc::foreach_incoming_nbr_gt(

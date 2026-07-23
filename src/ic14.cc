@@ -179,7 +179,7 @@ class IC14 {
       return score;
     }
 
-    void accumulate_scores(vid_t root, std::vector<int>* counts) const {
+    void accumulate_scores(vid_t root, std::vector<int>& counts) const {
       const auto comments = comment_creator_in_.get_edges(root);
       for (auto it = comments.begin(); it != comments.end(); ++it) {
         const vid_t comment_vid = *it;
@@ -188,8 +188,8 @@ class IC14 {
         if (post_vid != StorageReadInterface::kInvalidVid) {
           const vid_t author =
               ldbc::get_single_out_neighbor(post_creator_out_, post_vid);
-          if (author < counts->size() && (*counts)[author] != 0) {
-            (*counts)[author] += 2;
+          if (author < counts.size() && counts[author] != 0) {
+            counts[author] += 2;
           }
         } else {
           const vid_t parent = ldbc::get_single_out_neighbor(
@@ -197,8 +197,8 @@ class IC14 {
           if (parent != StorageReadInterface::kInvalidVid) {
             const vid_t author =
                 ldbc::get_single_out_neighbor(comment_creator_out_, parent);
-            if (author < counts->size() && (*counts)[author] != 0) {
-              (*counts)[author] += 1;
+            if (author < counts.size() && counts[author] != 0) {
+              counts[author] += 1;
             }
           }
         }
@@ -206,8 +206,8 @@ class IC14 {
         for (auto fit = followers.begin(); fit != followers.end(); ++fit) {
           const vid_t author =
               ldbc::get_single_out_neighbor(comment_creator_out_, *fit);
-          if (author < counts->size() && (*counts)[author] != 0) {
-            (*counts)[author] += 1;
+          if (author < counts.size() && counts[author] != 0) {
+            counts[author] += 1;
           }
         }
       }
@@ -217,8 +217,8 @@ class IC14 {
         for (auto rit = replies.begin(); rit != replies.end(); ++rit) {
           const vid_t author =
               ldbc::get_single_out_neighbor(comment_creator_out_, *rit);
-          if (author < counts->size() && (*counts)[author] != 0) {
-            (*counts)[author] += 2;
+          if (author < counts.size() && counts[author] != 0) {
+            counts[author] += 2;
           }
         }
       }
@@ -240,32 +240,32 @@ class IC14 {
   };
 
   static void bfs_layer(const CsrView& out_view, const CsrView& in_view,
-                        int8_t depth, std::queue<vid_t>* curr,
-                        std::queue<vid_t>* next, std::vector<int8_t>* dist0,
+                        int8_t depth, std::queue<vid_t>& curr,
+                        std::queue<vid_t>& next, std::vector<int8_t>& dist0,
                         const std::vector<int8_t>& dist1,
-                        std::vector<vid_t>* meet_points) {
-    while (!curr->empty()) {
-      const vid_t x = curr->front();
-      curr->pop();
+                        std::vector<vid_t>& meet_points) {
+    while (!curr.empty()) {
+      const vid_t x = curr.front();
+      curr.pop();
       const auto out_edges = out_view.get_edges(x);
       for (auto it = out_edges.begin(); it != out_edges.end(); ++it) {
         const vid_t v = *it;
-        if ((*dist0)[v] == -1) {
-          (*dist0)[v] = depth;
-          next->push(v);
+        if (dist0[v] == -1) {
+          dist0[v] = depth;
+          next.push(v);
           if (dist1[v] != -1) {
-            meet_points->push_back(v);
+            meet_points.push_back(v);
           }
         }
       }
       const auto in_edges = in_view.get_edges(x);
       for (auto it = in_edges.begin(); it != in_edges.end(); ++it) {
         const vid_t v = *it;
-        if ((*dist0)[v] == -1) {
-          (*dist0)[v] = depth;
-          next->push(v);
+        if (dist0[v] == -1) {
+          dist0[v] = depth;
+          next.push(v);
           if (dist1[v] != -1) {
-            meet_points->push_back(v);
+            meet_points.push_back(v);
           }
         }
       }
@@ -276,12 +276,12 @@ class IC14 {
                         vid_t src, vid_t dst,
                         const std::vector<int8_t>& dist_from_src,
                         const std::vector<bool>& on_path,
-                        std::vector<vid_t>* path,
-                        std::vector<std::vector<vid_t>>* paths) {
-    path->push_back(src);
+                        std::vector<vid_t>& path,
+                        std::vector<std::vector<vid_t>>& paths) {
+    path.push_back(src);
     if (src == dst) {
-      paths->push_back(*path);
-      path->pop_back();
+      paths.push_back(path);
+      path.pop_back();
       return;
     }
     const auto out_edges = out_view.get_edges(src);
@@ -300,7 +300,7 @@ class IC14 {
                   paths);
       }
     }
-    path->pop_back();
+    path.pop_back();
   }
 
   static std::vector<int> score_paths(
@@ -363,7 +363,7 @@ class IC14 {
         for (vid_t v : nbr_set) {
           counts[v] = 1;
         }
-        scorer.accumulate_scores(root, &counts);
+        scorer.accumulate_scores(root, counts);
         for (vid_t v : nbr_set) {
           score_cache[pair_key(root, v)] += (counts[v] - 1);
           counts[v] = 0;
@@ -397,7 +397,7 @@ class IC14 {
           "ic14 requires 2 arguments: person1Id and person2Id");
     }
     auto input = std::make_unique<IC14FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -449,16 +449,16 @@ class IC14 {
     while (true) {
       if (!q1.empty() && q1.size() <= q2.size()) {
         ++src_depth;
-        bfs_layer(knows_out, knows_in, src_depth, &q1, &tmp, &dist_from_src,
-                  dist_from_dst, &meet_points);
+        bfs_layer(knows_out, knows_in, src_depth, q1, tmp, dist_from_src,
+                  dist_from_dst, meet_points);
         if (!meet_points.empty()) {
           break;
         }
         std::swap(q1, tmp);
       } else if (!q2.empty()) {
         ++dst_depth;
-        bfs_layer(knows_out, knows_in, dst_depth, &q2, &tmp, &dist_from_dst,
-                  dist_from_src, &meet_points);
+        bfs_layer(knows_out, knows_in, dst_depth, q2, tmp, dist_from_dst,
+                  dist_from_src, meet_points);
         if (!meet_points.empty()) {
           break;
         }
@@ -525,8 +525,8 @@ class IC14 {
 
     std::vector<vid_t> path;
     std::vector<std::vector<vid_t>> paths;
-    dfs_paths(knows_out, knows_in, src, dst, dist_from_src, on_path, &path,
-              &paths);
+    dfs_paths(knows_out, knows_in, src, dst, dist_from_src, on_path, path,
+              paths);
     if (paths.empty()) {
       return execution::Context{};
     }

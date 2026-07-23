@@ -54,7 +54,7 @@ class IC8 {
       const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
       const ::physical::PhysicalPlan& plan, int op_idx) {
     auto input = std::make_unique<IC8FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -82,8 +82,7 @@ class IC8 {
   static void scan_replies(
       label_t person_label, label_t has_creator_label,
       const CsrView& reply_in_view, const CsrView& comment_has_creator_out,
-      vid_t message_vid, bool has_creator_date,
-      const EdgeDataAccessor& creator_accessor,
+      vid_t message_vid, 
       const StorageReadInterface::vertex_column_t<DateTime>* comment_date_col,
       const StorageReadInterface::vertex_column_t<int64_t>& comment_id_col,
       std::priority_queue<CommentResult, std::vector<CommentResult>,
@@ -100,18 +99,9 @@ class IC8 {
       info.comment_vid = comment_vid;
       info.author_vid = author_vid;
       info.comment_id = comment_id_col.get_view(comment_vid);
-      if (has_creator_date) {
-        const auto authors = comment_has_creator_out.get_edges(comment_vid);
-        for (auto author_it = authors.begin(); author_it != authors.end();
-             ++author_it) {
-          info.creation_date_ms =
-              creator_accessor.get_typed_data<DateTime>(author_it).milli_second;
-          break;
-        }
-      } else if (comment_date_col) {
-        info.creation_date_ms =
-            comment_date_col->get_view(comment_vid).milli_second;
-      }
+  
+      info.creation_date_ms =
+          comment_date_col->get_view(comment_vid).milli_second;
       consider_comment(pq, info);
     }
   }
@@ -174,15 +164,13 @@ class IC8 {
     const auto root_posts = post_has_creator_in.get_edges(root);
     for (auto it = root_posts.begin(); it != root_posts.end(); ++it) {
       scan_replies(person_label, has_creator_label, comment_reply_of_post_in,
-                   comment_has_creator_out, *it, has_creator_date,
-                   creator_accessor, comment_date_col.get(), *comment_id_col,
+                   comment_has_creator_out, *it, comment_date_col.get(), *comment_id_col,
                    pq);
     }
     const auto root_comments = comment_has_creator_in.get_edges(root);
     for (auto it = root_comments.begin(); it != root_comments.end(); ++it) {
       scan_replies(person_label, has_creator_label, comment_reply_of_comment_in,
-                   comment_has_creator_out, *it, has_creator_date,
-                   creator_accessor, comment_date_col.get(), *comment_id_col,
+                   comment_has_creator_out, *it, comment_date_col.get(), *comment_id_col,
                    pq);
     }
 

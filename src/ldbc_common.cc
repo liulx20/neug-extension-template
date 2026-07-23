@@ -23,16 +23,16 @@ namespace extension {
 namespace ldbc {
 
 void bind_ldbc_call(const ::physical::PhysicalPlan& plan, int op_idx,
-                    LdbcCallInput* input) {
-  bind_output_aliases(plan, op_idx, &input->output_aliases);
+                    LdbcCallInput& input) {
+  bind_output_aliases(plan, op_idx, input.output_aliases);
 }
 
 void bind_output_aliases(const ::physical::PhysicalPlan& plan, int op_idx,
-                         std::vector<int>* output_aliases) {
+                         std::vector<int>& output_aliases) {
   const auto& physical_op = plan.plan(op_idx);
-  output_aliases->reserve(physical_op.meta_data_size());
+  output_aliases.reserve(physical_op.meta_data_size());
   for (int i = 0; i < physical_op.meta_data_size(); ++i) {
-    output_aliases->push_back(physical_op.meta_data(i).alias());
+    output_aliases.push_back(physical_op.meta_data(i).alias());
   }
 }
 
@@ -40,18 +40,18 @@ void bind_output_aliases(const ::physical::PhysicalPlan& plan, int op_idx,
 
 bool find_message_vertex(const StorageReadInterface& graph, label_t post_label,
                          label_t comment_label, int64_t message_id,
-                         vid_t* message_vid, bool* is_post) {
+                         vid_t& message_vid, bool& is_post) {
   vid_t vid = StorageReadInterface::kInvalidVid;
   if (graph.GetVertexIndex(post_label, Value::INT64(message_id),
                            vid)) {
-    *message_vid = vid;
-    *is_post = true;
+    message_vid = vid;
+    is_post = true;
     return true;
   }
   if (graph.GetVertexIndex(comment_label, Value::INT64(message_id),
                            vid)) {
-    *message_vid = vid;
-    *is_post = false;
+    message_vid = vid;
+    is_post = false;
     return true;
   }
   return false;

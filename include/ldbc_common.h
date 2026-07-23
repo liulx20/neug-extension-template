@@ -37,7 +37,7 @@ struct LdbcCallInput : function::CallFuncInputBase {
 };
 
 void bind_ldbc_call(const ::physical::PhysicalPlan& plan, int op_idx,
-                    LdbcCallInput* input);
+                    LdbcCallInput& input);
 
 template <typename T>
 inline std::shared_ptr<StorageReadInterface::vertex_column_t<T>>
@@ -65,11 +65,11 @@ inline size_t count_edges(const CsrView& view, vid_t vertex) {
 }
 
 void bind_output_aliases(const ::physical::PhysicalPlan& plan, int op_idx,
-                         std::vector<int>* output_aliases);
+                         std::vector<int>& output_aliases);
 
 bool find_message_vertex(const StorageReadInterface& graph, label_t post_label,
                          label_t comment_label, int64_t message_id,
-                         vid_t* message_vid, bool* is_post);
+                         vid_t& message_vid, bool& is_post);
 
 vid_t resolve_root_post(const StorageReadInterface& graph, label_t post_label,
                         label_t comment_label, label_t reply_of_label,
@@ -188,9 +188,9 @@ inline void foreach_knows_1d_2d_neighbor(const StorageReadInterface& graph,
 inline void mark_knows_1d_2d_neighbors(const StorageReadInterface& graph,
                                        label_t person_label,
                                        label_t knows_label, vid_t root,
-                                       std::vector<bool>* friends) {
-  friends->assign(graph.GetVertexSet(person_label).size(), false);
-  (*friends)[root] = true;
+                                       std::vector<bool>& friends) {
+  friends.assign(graph.GetVertexSet(person_label).size(), false);
+  friends[root] = true;
   const auto out_view = graph.GetGenericOutgoingGraphView(
       person_label, person_label, knows_label);
   const auto in_view = graph.GetGenericIncomingGraphView(
@@ -199,25 +199,25 @@ inline void mark_knows_1d_2d_neighbors(const StorageReadInterface& graph,
   std::vector<vid_t> neighbors;
   const auto root_in = in_view.get_edges(root);
   for (auto it = root_in.begin(); it != root_in.end(); ++it) {
-    (*friends)[*it] = true;
+    friends[*it] = true;
     neighbors.push_back(*it);
   }
   const auto root_out = out_view.get_edges(root);
   for (auto it = root_out.begin(); it != root_out.end(); ++it) {
-    (*friends)[*it] = true;
+    friends[*it] = true;
     neighbors.push_back(*it);
   }
   for (vid_t neighbor : neighbors) {
     const auto neighbor_in = in_view.get_edges(neighbor);
     for (auto it = neighbor_in.begin(); it != neighbor_in.end(); ++it) {
-      (*friends)[*it] = true;
+      friends[*it] = true;
     }
     const auto neighbor_out = out_view.get_edges(neighbor);
     for (auto it = neighbor_out.begin(); it != neighbor_out.end(); ++it) {
-      (*friends)[*it] = true;
+      friends[*it] = true;
     }
   }
-  (*friends)[root] = false;
+  friends[root] = false;
 }
 
 vid_t find_vertex_by_string_prop(const StorageReadInterface& graph,

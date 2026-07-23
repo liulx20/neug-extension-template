@@ -66,7 +66,7 @@ class IC11 {
           "ic11 requires 3 arguments: personId, countryName, workFromYear");
     }
     auto input = std::make_unique<IC11FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -94,10 +94,6 @@ class IC11 {
         ldbc::get_vertex_column<std::string_view>(graph, org_label, "name");
     auto person_id_col =
         ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
-    if (!first_name_col || !last_name_col || !org_name_col) {
-      THROW_RUNTIME_ERROR(
-          "ic11: failed to load required LDBC property columns");
-    }
 
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {
@@ -112,7 +108,7 @@ class IC11 {
 
     std::vector<bool> friends;
     ldbc::mark_knows_1d_2d_neighbors(graph, person_label, knows_label, root,
-                                     &friends);
+                                     friends);
 
     const auto org_located_in_in = graph.GetGenericIncomingGraphView(
         place_label, org_label, is_located_in_label);

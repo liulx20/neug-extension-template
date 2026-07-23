@@ -80,22 +80,22 @@ class IC1 {
 
   static void try_enqueue_friend(
       std::priority_queue<PersonResult, std::vector<PersonResult>,
-                          PersonResultComparer>* pq,
+                          PersonResultComparer>& pq,
       int dist, std::string_view last_name, int64_t id, vid_t vid) {
-    if (pq->size() < kTopN) {
-      pq->push({static_cast<uint8_t>(dist), last_name, id, vid});
+    if (pq.size() < kTopN) {
+      pq.push({static_cast<uint8_t>(dist), last_name, id, vid});
       return;
     }
-    const auto& top = pq->top();
+    const auto& top = pq.top();
     if (dist != top.distance) {
       return;
     }
     if (last_name < top.last_name) {
-      pq->pop();
-      pq->push({static_cast<uint8_t>(dist), last_name, id, vid});
+      pq.pop();
+      pq.push({static_cast<uint8_t>(dist), last_name, id, vid});
     } else if (last_name == top.last_name && id < top.id) {
-      pq->pop();
-      pq->push({static_cast<uint8_t>(dist), last_name, id, vid});
+      pq.pop();
+      pq.push({static_cast<uint8_t>(dist), last_name, id, vid});
     }
   }
 
@@ -107,7 +107,7 @@ class IC1 {
       const StorageReadInterface::vertex_column_t<std::string_view>&
           last_name_col,
       const StorageReadInterface::vertex_column_t<int64_t>& person_id_col,
-      std::vector<PersonResult>* results) {
+      std::vector<PersonResult>& results) {
     const auto knows_out = graph.GetGenericOutgoingGraphView(
         person_label, person_label, knows_label);
     const auto knows_in = graph.GetGenericIncomingGraphView(
@@ -128,7 +128,7 @@ class IC1 {
       d1_friends.push_back(v);
       accessed[v] = true;
       if (first_name_col.get_view(v) == first_name) {
-        try_enqueue_friend(&pq, 1, last_name_col.get_view(v),
+        try_enqueue_friend(pq, 1, last_name_col.get_view(v),
                            person_id_col.get_view(v), v);
       }
     }
@@ -138,15 +138,15 @@ class IC1 {
       d1_friends.push_back(v);
       accessed[v] = true;
       if (first_name_col.get_view(v) == first_name) {
-        try_enqueue_friend(&pq, 1, last_name_col.get_view(v),
+        try_enqueue_friend(pq, 1, last_name_col.get_view(v),
                            person_id_col.get_view(v), v);
       }
     }
 
     if (pq.size() == kTopN) {
-      results->reserve(pq.size());
+      results.reserve(pq.size());
       while (!pq.empty()) {
-        results->push_back(pq.top());
+        results.push_back(pq.top());
         pq.pop();
       }
       return;
@@ -162,7 +162,7 @@ class IC1 {
         d2_friends.push_back(v);
         accessed[v] = true;
         if (first_name_col.get_view(v) == first_name) {
-          try_enqueue_friend(&pq, 2, last_name_col.get_view(v),
+          try_enqueue_friend(pq, 2, last_name_col.get_view(v),
                              person_id_col.get_view(v), v);
         }
       }
@@ -175,16 +175,16 @@ class IC1 {
         d2_friends.push_back(v);
         accessed[v] = true;
         if (first_name_col.get_view(v) == first_name) {
-          try_enqueue_friend(&pq, 2, last_name_col.get_view(v),
+          try_enqueue_friend(pq, 2, last_name_col.get_view(v),
                              person_id_col.get_view(v), v);
         }
       }
     }
 
     if (pq.size() == kTopN) {
-      results->reserve(pq.size());
+      results.reserve(pq.size());
       while (!pq.empty()) {
-        results->push_back(pq.top());
+        results.push_back(pq.top());
         pq.pop();
       }
       return;
@@ -199,7 +199,7 @@ class IC1 {
         }
         accessed[v] = true;
         if (first_name_col.get_view(v) == first_name) {
-          try_enqueue_friend(&pq, 3, last_name_col.get_view(v),
+          try_enqueue_friend(pq, 3, last_name_col.get_view(v),
                              person_id_col.get_view(v), v);
         }
       }
@@ -211,15 +211,15 @@ class IC1 {
         }
         accessed[v] = true;
         if (first_name_col.get_view(v) == first_name) {
-          try_enqueue_friend(&pq, 3, last_name_col.get_view(v),
+          try_enqueue_friend(pq, 3, last_name_col.get_view(v),
                              person_id_col.get_view(v), v);
         }
       }
     }
 
-    results->reserve(pq.size());
+    results.reserve(pq.size());
     while (!pq.empty()) {
-      results->push_back(pq.top());
+      results.push_back(pq.top());
       pq.pop();
     }
   }
@@ -234,7 +234,7 @@ class IC1 {
           "ic1 requires 2 arguments: personId and firstName");
     }
     auto input = std::make_unique<IC1FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -286,7 +286,7 @@ class IC1 {
 
     std::vector<PersonResult> results;
     collect_friends(graph, person_label, knows_label, root, first_name,
-                    *first_name_col, *last_name_col, *person_id_col, &results);
+                    *first_name_col, *last_name_col, *person_id_col, results);
     if (results.empty()) {
       return execution::Context{};
     }
@@ -300,20 +300,10 @@ class IC1 {
     const auto org_located_in_out = graph.GetGenericOutgoingGraphView(
         org_label, place_label, is_located_in_label);
 
-    const bool has_class_year = schema.edge_has_property(
+    const auto& class_year_accessor = graph.GetEdgeDataAccessor(
         person_label, org_label, study_at_label, "classYear");
-    const bool has_work_from = schema.edge_has_property(
-        person_label, org_label, work_at_label, "workFrom");
-    EdgeDataAccessor class_year_accessor;
-    EdgeDataAccessor work_from_accessor;
-    if (has_class_year) {
-      class_year_accessor = graph.GetEdgeDataAccessor(
-          person_label, org_label, study_at_label, "classYear");
-    }
-    if (has_work_from) {
-      work_from_accessor = graph.GetEdgeDataAccessor(person_label, org_label,
+    const auto& work_from_accessor = graph.GetEdgeDataAccessor(person_label, org_label,
                                                      work_at_label, "workFrom");
-    }
 
     ValueColumnBuilder<int64_t> friend_id_builder;
     ValueColumnBuilder<int32_t> distance_builder;
@@ -382,9 +372,8 @@ class IC1 {
       for (auto it = study_edges.begin(); it != study_edges.end(); ++it) {
         const vid_t org_vid = *it;
         int32_t class_year = 0;
-        if (has_class_year) {
-          class_year = class_year_accessor.get_typed_data<int32_t>(it);
-        }
+    
+        class_year = class_year_accessor.get_typed_data<int32_t>(it);
         const vid_t place_vid =
             ldbc::get_single_out_neighbor(org_located_in_out, org_vid);
         std::string city_name;
@@ -406,10 +395,8 @@ class IC1 {
       const auto work_edges = person_work_at_out.get_edges(v);
       for (auto it = work_edges.begin(); it != work_edges.end(); ++it) {
         const vid_t org_vid = *it;
-        int32_t work_from = 0;
-        if (has_work_from) {
-          work_from = work_from_accessor.get_typed_data<int32_t>(it);
-        }
+        int32_t work_from =  work_from_accessor.get_typed_data<int32_t>(it);
+        
         const vid_t place_vid =
             ldbc::get_single_out_neighbor(org_located_in_out, org_vid);
         std::string country_name;

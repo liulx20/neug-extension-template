@@ -55,7 +55,6 @@ class IC9 {
       const ldbc::TypedView& has_creator_in,
       const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
       bool is_post, vid_t friend_vid, int64_t max_date_ms,
-      const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,
       std::priority_queue<MessageInfo, std::vector<MessageInfo>,
                           MessageInfoComparer>& pq) {
     ldbc::foreach_incoming_nbr_between(
@@ -99,7 +98,7 @@ class IC9 {
           "ic9 requires 2 arguments: personId and maxDate");
     }
     auto input = std::make_unique<IC9FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -121,10 +120,6 @@ class IC9 {
         graph, person_label, "firstName");
     auto last_name_col = ldbc::get_vertex_column<std::string_view>(
         graph, person_label, "lastName");
-    auto post_date_col =
-        ldbc::get_vertex_column<DateTime>(graph, post_label, "creationDate");
-    auto comment_date_col =
-        ldbc::get_vertex_column<DateTime>(graph, comment_label, "creationDate");
     auto person_id_col =
         ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
     auto post_id_col =
@@ -151,9 +146,9 @@ class IC9 {
     ldbc::foreach_knows_1d_2d_neighbor(
         graph, person_label, knows_label, root, [&](vid_t friend_vid) {
           scan_messages(post_has_creator_in, *post_id_col, true, friend_vid,
-                        max_date_ms, post_date_col.get(), pq);
+                        max_date_ms, pq);
           scan_messages(comment_has_creator_in, *comment_id_col, false,
-                        friend_vid, max_date_ms, comment_date_col.get(), pq);
+                        friend_vid, max_date_ms, pq);
         });
 
     std::vector<MessageInfo> results;

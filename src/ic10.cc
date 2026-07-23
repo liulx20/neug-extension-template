@@ -88,7 +88,7 @@ class IC10 {
           "ic10 requires 2 arguments: personId and month");
     }
     auto input = std::make_unique<IC10FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -122,11 +122,6 @@ class IC10 {
         ldbc::get_vertex_column<std::string_view>(graph, place_label, "name");
     auto person_id_col =
         ldbc::get_vertex_column<int64_t>(graph, person_label, "id");
-    if (!first_name_col || !last_name_col || !gender_col || !birthday_col ||
-        !place_name_col) {
-      THROW_RUNTIME_ERROR(
-          "ic10: failed to load required LDBC property columns");
-    }
 
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {
@@ -236,12 +231,9 @@ class IC10 {
           std::string(gender_col->get_view(row.person_vid)));
       const vid_t place_vid =
           ldbc::get_single_out_neighbor(person_located_in_out, row.person_vid);
-      if (place_vid != StorageReadInterface::kInvalidVid) {
-        city_builder.push_back_opt(
-            std::string(place_name_col->get_view(place_vid)));
-      } else {
-        city_builder.push_back_null();
-      }
+      city_builder.push_back_opt(
+          std::string(place_name_col->get_view(place_vid)));
+  
     }
 
     execution::ContextChunk chunk;

@@ -50,20 +50,20 @@ class IC6 {
   };
 
   static void try_push_tag(
-      std::priority_queue<TagResult, std::vector<TagResult>, TagResultComparer>*
+      std::priority_queue<TagResult, std::vector<TagResult>, TagResultComparer>&
           heap,
       int count, std::string_view tag_name) {
     if (count == 0) {
       return;
     }
-    if (heap->size() < kTopN) {
-      heap->push({count, tag_name});
+    if (heap.size() < kTopN) {
+      heap.push({count, tag_name});
       return;
     }
-    const auto& top = heap->top();
+    const auto& top = heap.top();
     if (count > top.count || (count == top.count && tag_name < top.tag_name)) {
-      heap->pop();
-      heap->push({count, tag_name});
+      heap.pop();
+      heap.push({count, tag_name});
     }
   }
 
@@ -77,7 +77,7 @@ class IC6 {
           "ic6 requires 2 arguments: personId and tagName");
     }
     auto input = std::make_unique<IC6FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -98,10 +98,6 @@ class IC6 {
 
     auto tag_name_col =
         ldbc::get_vertex_column<std::string_view>(graph, tag_label, "name");
-    if (!tag_name_col) {
-      THROW_RUNTIME_ERROR("ic6: failed to load required LDBC property columns");
-    }
-
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {
       return execution::Context{};
@@ -115,7 +111,7 @@ class IC6 {
 
     std::vector<bool> friends;
     ldbc::mark_knows_1d_2d_neighbors(graph, person_label, knows_label, root,
-                                     &friends);
+                                     friends);
 
     const size_t tag_num = graph.GetVertexSet(tag_label).size();
     std::vector<int> post_count(tag_num, 0);
@@ -150,7 +146,7 @@ class IC6 {
     std::priority_queue<TagResult, std::vector<TagResult>, TagResultComparer>
         heap;
     for (vid_t other_tag_vid = 0; other_tag_vid < tag_num; ++other_tag_vid) {
-      try_push_tag(&heap, post_count[other_tag_vid],
+      try_push_tag(heap, post_count[other_tag_vid],
                    tag_name_col->get_view(other_tag_vid));
     }
 

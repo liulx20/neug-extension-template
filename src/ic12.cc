@@ -60,8 +60,8 @@ class IC12 {
                                     label_t has_type_label,
                                     label_t is_subclass_of_label,
                                     vid_t tag_class_vid,
-                                    std::vector<uint8_t>* tag_set) {
-    tag_set->assign(graph.GetVertexSet(tag_label).size(), 0);
+                                    std::vector<uint8_t>& tag_set) {
+    tag_set.assign(graph.GetVertexSet(tag_label).size(), 0);
     const auto subclass_in = graph.GetGenericIncomingGraphView(
         tag_class_label, tag_class_label, is_subclass_of_label);
     const auto tag_has_type_in = graph.GetGenericIncomingGraphView(
@@ -78,7 +78,7 @@ class IC12 {
       }
       const auto tags = tag_has_type_in.get_edges(current);
       for (auto it = tags.begin(); it != tags.end(); ++it) {
-        (*tag_set)[*it] = 1;
+        tag_set[*it] = 1;
       }
     }
   }
@@ -87,7 +87,7 @@ class IC12 {
       const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
       const ::physical::PhysicalPlan& plan, int op_idx) {
     auto input = std::make_unique<IC12FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -138,7 +138,7 @@ class IC12 {
 
     std::vector<uint8_t> tag_set;
     collect_tags_in_class(graph, tag_class_label, tag_label, has_type_label,
-                          is_subclass_of_label, tag_class_vid, &tag_set);
+                          is_subclass_of_label, tag_class_vid, tag_set);
 
     const auto comment_has_creator_in = graph.GetGenericIncomingGraphView(
         person_label, comment_label, has_creator_label);

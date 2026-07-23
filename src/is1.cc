@@ -32,7 +32,7 @@ class IS1 {
       const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
       const ::physical::PhysicalPlan& plan, int op_idx) {
     auto input = std::make_unique<IS1FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 

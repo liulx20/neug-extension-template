@@ -42,7 +42,7 @@ class IS7 {
       const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
       const ::physical::PhysicalPlan& plan, int op_idx) {
     auto input = std::make_unique<IS7FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -74,7 +74,7 @@ class IS7 {
     vid_t message_vid = StorageReadInterface::kInvalidVid;
     bool is_post = false;
     if (!ldbc::find_message_vertex(graph, post_label, comment_label, message_id,
-                                   &message_vid, &is_post)) {
+                                   message_vid, is_post)) {
       return execution::Context{};
     }
 

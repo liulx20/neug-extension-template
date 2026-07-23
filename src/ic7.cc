@@ -57,10 +57,8 @@ class IC7 {
   static std::unique_ptr<function::CallFuncInputBase> bind(
       const Schema& /*schema*/, const execution::ContextMeta& /*ctx_meta*/,
       const ::physical::PhysicalPlan& plan, int op_idx) {
-    const auto& params =
-        plan.plan(op_idx).opr().procedure_call().query().arguments();
     auto input = std::make_unique<IC7FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
@@ -71,7 +69,7 @@ class IC7 {
       const StorageReadInterface::vertex_column_t<DateTime>* message_date_col,
       const StorageReadInterface::vertex_column_t<int64_t>& message_id_col,
       const StorageReadInterface::vertex_column_t<int64_t>& person_id_col,
-      std::vector<LikeResult>* messages) {
+      std::vector<LikeResult>& messages) {
     const auto message_has_creator_in = graph.GetGenericIncomingGraphView(
         person_label, message_label, has_creator_label);
     const auto person_likes_message_in = graph.GetGenericIncomingGraphView(
@@ -110,7 +108,7 @@ class IC7 {
           info.like_date_ms =
               message_date_col->get_view(message_vid).milli_second;
         }
-        messages->push_back(info);
+        messages.push_back(info);
       }
     }
   }
@@ -143,9 +141,6 @@ class IC7 {
         ldbc::get_vertex_column<int64_t>(graph, post_label, "id");
     auto comment_id_col =
         ldbc::get_vertex_column<int64_t>(graph, comment_label, "id");
-    if (!first_name_col || !last_name_col) {
-      THROW_RUNTIME_ERROR("ic7: failed to load required LDBC property columns");
-    }
 
     vid_t root = StorageReadInterface::kInvalidVid;
     if (!graph.GetVertexIndex(person_label, Value::INT64(person_id), root)) {
@@ -169,11 +164,11 @@ class IC7 {
     std::vector<LikeResult> messages;
     collect_likes(graph, schema, person_label, post_label, likes_label,
                   has_creator_label, true, root, post_creation_date_col.get(),
-                  *post_id_col, *person_id_col, &messages);
+                  *post_id_col, *person_id_col, messages);
     collect_likes(graph, schema, person_label, comment_label, likes_label,
                   has_creator_label, false, root,
                   comment_creation_date_col.get(), *comment_id_col,
-                  *person_id_col, &messages);
+                  *person_id_col, messages);
 
     std::sort(messages.begin(), messages.end(),
               [](const LikeResult& lhs, const LikeResult& rhs) {
@@ -202,24 +197,6 @@ class IC7 {
       }
     }
 
-    const auto post_has_creator_out = graph.GetGenericOutgoingGraphView(
-        post_label, person_label, has_creator_label);
-    const auto comment_has_creator_out = graph.GetGenericOutgoingGraphView(
-        comment_label, person_label, has_creator_label);
-    const bool post_has_creator_date = schema.edge_has_property(
-        post_label, person_label, has_creator_label, "creationDate");
-    const bool comment_has_creator_date = schema.edge_has_property(
-        comment_label, person_label, has_creator_label, "creationDate");
-    EdgeDataAccessor post_creator_accessor;
-    EdgeDataAccessor comment_creator_accessor;
-    if (post_has_creator_date) {
-      post_creator_accessor = graph.GetEdgeDataAccessor(
-          post_label, person_label, has_creator_label, "creationDate");
-    }
-    if (comment_has_creator_date) {
-      comment_creator_accessor = graph.GetEdgeDataAccessor(
-          comment_label, person_label, has_creator_label, "creationDate");
-    }
 
     std::vector<LikeResult> results;
     results.reserve(pq.size());
@@ -251,30 +228,13 @@ class IC7 {
 
       int64_t message_creation_ms = 0;
       if (row.is_post) {
-        if (post_has_creator_date) {
-          const auto edges = post_has_creator_out.get_edges(row.message_vid);
-          for (auto it = edges.begin(); it != edges.end(); ++it) {
+    
             message_creation_ms =
-                post_creator_accessor.get_typed_data<DateTime>(it).milli_second;
-            break;
-          }
-        } else if (post_creation_date_col) {
-          message_creation_ms =
               post_creation_date_col->get_view(row.message_vid).milli_second;
-        }
       } else {
-        if (comment_has_creator_date) {
-          const auto edges = comment_has_creator_out.get_edges(row.message_vid);
-          for (auto it = edges.begin(); it != edges.end(); ++it) {
-            message_creation_ms =
-                comment_creator_accessor.get_typed_data<DateTime>(it)
-                    .milli_second;
-            break;
-          }
-        } else if (comment_creation_date_col) {
+
           message_creation_ms =
               comment_creation_date_col->get_view(row.message_vid).milli_second;
-        }
       }
       const int32_t minutes = static_cast<int32_t>(
           (row.like_date_ms - message_creation_ms) / kMillisPerMinute);

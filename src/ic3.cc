@@ -68,7 +68,7 @@ class IC3 {
     }
 
     auto input = std::make_unique<IC3FuncInput>();
-    ldbc::bind_ldbc_call(plan, op_idx, input.get());
+    ldbc::bind_ldbc_call(plan, op_idx, *input);
     return input;
   }
 
